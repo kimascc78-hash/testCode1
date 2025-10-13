@@ -1,0 +1,1348 @@
+"""
+Oscilloscope View Module
+오실로스코프 스타일 9채널 통합 뷰 - 트리거 포인트 드래그 및 0점 동기화, Single 모드에서 pre/post 유지
+"""
+
+import time
+from collections import deque
+from PyQt5.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QPushButton, 
+    QLabel, QGroupBox, QButtonGroup, QSizePolicy, QComboBox, QDoubleSpinBox, 
+    QFrame  #선큰 추가
+)
+from PyQt5.QtCore import Qt, pyqtSignal, QTimer
+from PyQt5.QtGui import QFont
+import pyqtgraph as pg
+import numpy as np
+
+# pyqtgraph 성능 최적화 설정
+#pg.setConfigOptions(antialias=True, useOpenGL=True, enableExperimental=True, foreground='w', background='k')
+pg.setConfigOptions(antialias=True, useOpenGL=False, enableExperimental=False, foreground='w', background='k')
+
+# 옵션 1: 모던 하이테크 (추천)
+# 옵션 2: 클래식 장비 스타일
+# 옵션 3: 미래지향적 
+# 옵션 4: 클린 & 프로페셔널
+# 옵션 5: 하이테크 산세리프 (실제 장비 느낌)
+SCOPE_FONTS = {
+    'V0': "'Courier New', monospace",
+    'V1': "'JetBrains Mono', 'Fira Code', 'SF Mono', 'Consolas', monospace",
+    'V2': "'Orbitron', 'Exo 2', 'Roboto Mono', monospace",
+    'V3': "'Segoe UI', 'SF Pro Text', 'Roboto', sans-serif",
+    'V4': "'Source Code Pro', 'Ubuntu Mono', 'Lucida Console', monospace",
+    'V5': "'Monaco', 'Menlo', 'DejaVu Sans Mono', monospace",
+}
+
+# 원하는 폰트 선택
+SELECTED_FONT = SCOPE_FONTS['V1']  # 이 줄만 수정해서 테스트
+
+#기본 테마
+# 색상 및 크기, 위치 상수 정의
+COLORS = {
+    'BACKGROUND': '#3b4252',         # 미드나잇 블루 그레이 - 메인 배경색
+    'TEXT': '#ffffff',               # 순백 - 기본 텍스트 색상
+    'GROUPBOX_BORDER': '#00FFFF',    # 시안 - 그룹박스 테두리
+    'GROUPBOX_TITLE': '#ffffff',     # 라임 그린 - 그룹박스 제목 색상
+    'BUTTON_BG': '#333333',          # 다크 그레이 - 버튼 기본 배경
+    'BUTTON_BORDER': '#555555',      # 미디엄 그레이 - 버튼 테두리
+    'BUTTON_TEXT': '#cccccc',        # 라이트 그레이 - 버튼 텍스트
+    'BUTTON_HOVER_BG': '#444444',    # 호버 그레이 - 버튼 호버 배경
+    'BUTTON_HOVER_BORDER': '#777777', # 호버 테두리 - 버튼 호버시 테두리
+    'BUTTON_CHECKED_BG': '#0066cc',  # 오션 블루 - 선택된 버튼 배경
+    'BUTTON_CHECKED_BORDER': '#0088ff', # 브라이트 블루 - 선택된 버튼 테두리
+    'RUN_BUTTON_BG': '#6366f1',      # 인디고 블루 - 활동적인 시작
+    'RUN_BUTTON_BORDER': '#4f46e5',  # 딥 인디고 - 테두리
+    'RUN_BUTTON_HOVER': '#818cf8',   # 라이트 인디고 - 호버
+    'RUN_BUTTON_PRESSED': '#3730a3', # 다크 인디고 - 눌림
+    'STOP_BUTTON_BG': '#64748b',     # 블루 그레이 - 차분한 정지
+    'STOP_BUTTON_BORDER': '#475569', # 다크 블루 그레이 - 테두리
+    'STOP_BUTTON_HOVER': '#94a3b8',  # 라이트 블루 그레이 - 호버
+    'STOP_BUTTON_PRESSED': '#334155',# 딥 블루 그레이 - 눌림
+    'LABEL_TEXT': '#cccccc',         # 라이트 그레이 - 라벨 텍스트
+    'PLOT_BG': '#2a2a2a',            # 차콜 그레이 - 플롯 배경색
+    'GRID_ALPHA': 0.3,               # 그리드 투명도 (30%)
+    'CHANNELS': [                    # 9채널 신호 색상 팔레트
+        '#00ff00', # CH1: 라임 그린 - Forward Power
+        '#ffff00', # CH2: 옐로우 - Reflect Power  
+        '#ff00ff', # CH3: 마젠타 - Delivery Power
+        '#00ffff', # CH4: 시안 - Frequency
+        '#ff8800', # CH5: 오렌지 - Gamma
+        '#88ff00', # CH6: 옐로우 그린 - Real Gamma
+        '#ff0088', # CH7: 핑크 - Image Gamma
+        '#8800ff', # CH8: 바이올렛 - RF Phase
+        '#ffffff'  # CH9: 화이트 - Temperature
+    ],
+    # UI 컴포넌트 크기 상수
+    'MAX_LEFT_PENEL_WIDTH': 280,     # 좌측 패널 최대 너비
+    'RF_CONTROL_WIDTH': 280,         # RF 컨트롤 패널 너비
+    'RF_CONTROL_HEIGHT': 100,        # RF 컨트롤 패널 높이
+    'CHANNEL_GRID_WIDTH': 280,       # 채널 그리드 너비
+    'CHANNEL_GRID_HEIGHT': 190,      # 채널 그리드 높이
+    'TIMEBASE_WIDTH': 280,           # 타임베이스 위젯 너비
+    'TIMEBASE_HEIGHT': 130,          # 타임베이스 위젯 높이
+    'TRIGGER_WIDTH': 280,            # 트리거 위젯 너비
+    'TRIGGER_HEIGHT': 180,           # 트리거 위젯 높이
+    'MEASUREMENT_WIDTH': 280,        # 측정 컨트롤 너비
+    'MEASUREMENT_HEIGHT': 120,       # 측정 컨트롤 높이
+    'CONTROLS_WIDTH': 280,           # 컨트롤 패널 너비
+    'CONTROLS_HEIGHT': 95,          # 컨트롤 패널 높이 (확장됨)
+    'MEASUREMENT_FONT_SIZE': 12,     # 측정값 폰트 크기
+}
+
+"""
+# 다크 테마
+COLORS = {
+    'BACKGROUND': '#2b2d31',         # 다크 그레이
+    'TEXT': '#ffffff',               # 순백
+    'GROUPBOX_BORDER': '#5865f2',    # 모던 보라
+    'GROUPBOX_TITLE': '#00d4ff',     # 시안 블루
+    'BUTTON_BG': '#404249',          # 미드 그레이
+    'BUTTON_BORDER': '#5865f2',      # 보라 테두리
+    'BUTTON_TEXT': '#ffffff',        # 순백 텍스트
+    'BUTTON_HOVER_BG': '#5865f2',    # 보라 호버
+    'BUTTON_HOVER_BORDER': '#7289da', # 밝은 보라
+    'BUTTON_CHECKED_BG': '#00d4ff',  # 시안 선택
+    'BUTTON_CHECKED_BORDER': '#00b4d8',
+    'RUN_BUTTON_BG': '#57f287',      # 모던 그린
+    'RUN_BUTTON_BORDER': '#3ba55d',
+    'RUN_BUTTON_HOVER': '#43c471',
+    'RUN_BUTTON_PRESSED': '#2d7d32',
+    'STOP_BUTTON_BG': '#ed4245',     # 모던 레드
+    'STOP_BUTTON_BORDER': '#c62828',
+    'STOP_BUTTON_HOVER': '#f56565',
+    'STOP_BUTTON_PRESSED': '#ad1457',
+    'LABEL_TEXT': '#b9bbbe',         # 연한 그레이
+    'PLOT_BG': '#1e2124',           # 더 어두운 배경
+    'GRID_ALPHA': 0.2,
+    'CHANNELS': [                    # 더 선명하고 모던한 채널 색상
+        '#00ff9f',    # 에메랄드 그린
+        '#ff6b6b',    # 코랄 레드  
+        '#4ecdc4',    # 터쿠아즈
+        '#ffe66d',    # 밝은 옐로우
+        '#a8e6cf',    # 민트 그린
+        '#ff8b94',    # 핑크
+        '#ffd93d',    # 골드
+        '#6c5ce7',    # 바이올렛
+        '#fd79a8'     # 로즈
+    ],
+    # 크기 상수는 동일
+    'MAX_LEFT_PENEL_WIDTH': 280,
+    'RF_CONTROL_WIDTH': 280,
+    'RF_CONTROL_HEIGHT': 100,
+    'CHANNEL_GRID_WIDTH': 280,
+    'CHANNEL_GRID_HEIGHT': 180,
+    'TIMEBASE_WIDTH': 280,
+    'TIMEBASE_HEIGHT': 130,
+    'TRIGGER_WIDTH': 280,
+    'TRIGGER_HEIGHT': 180,
+    'MEASUREMENT_WIDTH': 280,
+    'MEASUREMENT_HEIGHT': 120,
+    'CONTROLS_WIDTH': 280,
+    'CONTROLS_HEIGHT': 105,
+    'MEASUREMENT_FONT_SIZE': 12,
+}
+"""
+"""
+# 사이버펑크 테마
+COLORS = {
+    'BACKGROUND': '#0a0a0a',
+    'TEXT': '#00ff41',
+    'GROUPBOX_BORDER': '#ff0080',
+    'GROUPBOX_TITLE': '#00ffff',
+    'BUTTON_BG': '#1a1a1a',
+    'BUTTON_BORDER': '#ff0080',
+    'BUTTON_TEXT': '#00ff41',
+    'BUTTON_HOVER_BG': '#ff0080',
+    'BUTTON_HOVER_BORDER': '#ff00ff',
+    'BUTTON_CHECKED_BG': '#00ffff',
+    'BUTTON_CHECKED_BORDER': '#0080ff',
+    'RUN_BUTTON_BG': '#00ff00',
+    'RUN_BUTTON_BORDER': '#00cc00',
+    'RUN_BUTTON_HOVER': '#00dd00',
+    'RUN_BUTTON_PRESSED': '#008800',
+    'STOP_BUTTON_BG': '#ff0040',
+    'STOP_BUTTON_BORDER': '#cc0033',
+    'STOP_BUTTON_HOVER': '#ff3366',
+    'STOP_BUTTON_PRESSED': '#990022',
+    'LABEL_TEXT': '#00ff41',
+    'PLOT_BG': '#000000',
+    'GRID_ALPHA': 0.3,
+    'CHANNELS': [
+        '#00ff00', '#ff0080', '#00ffff', '#ffff00',
+        '#ff8000', '#8000ff', '#ff0040', '#40ff80', '#0080ff'
+    ],
+    # 크기 상수는 동일
+    'MAX_LEFT_PENEL_WIDTH': 280,
+    'RF_CONTROL_WIDTH': 280,
+    'RF_CONTROL_HEIGHT': 100,
+    'CHANNEL_GRID_WIDTH': 280,
+    'CHANNEL_GRID_HEIGHT': 180,
+    'TIMEBASE_WIDTH': 280,
+    'TIMEBASE_HEIGHT': 130,
+    'TRIGGER_WIDTH': 280,
+    'TRIGGER_HEIGHT': 180,
+    'MEASUREMENT_WIDTH': 280,
+    'MEASUREMENT_HEIGHT': 120,
+    'CONTROLS_WIDTH': 280,
+    'CONTROLS_HEIGHT': 105,
+    'MEASUREMENT_FONT_SIZE': 12,
+}
+"""
+"""
+# 프다 테마
+COLORS = {
+    'BACKGROUND': '#1e1e2e',
+    'TEXT': '#cdd6f4',
+    'GROUPBOX_BORDER': '#89b4fa',
+    'GROUPBOX_TITLE': '#f38ba8',
+    'BUTTON_BG': '#313244',
+    'BUTTON_BORDER': '#6c7086',
+    'BUTTON_TEXT': '#cdd6f4',
+    'BUTTON_HOVER_BG': '#45475a',
+    'BUTTON_HOVER_BORDER': '#89b4fa',
+    'BUTTON_CHECKED_BG': '#89b4fa',
+    'BUTTON_CHECKED_BORDER': '#74c7ec',
+    'RUN_BUTTON_BG': '#a6e3a1',
+    'RUN_BUTTON_BORDER': '#94e2d5',
+    'RUN_BUTTON_HOVER': '#b8e6b3',
+    'RUN_BUTTON_PRESSED': '#82d982',
+    'STOP_BUTTON_BG': '#f38ba8',
+    'STOP_BUTTON_BORDER': '#eba0ac',
+    'STOP_BUTTON_HOVER': '#f5a3ba',
+    'STOP_BUTTON_PRESSED': '#e8687f',
+    'LABEL_TEXT': '#a6adc8',
+    'PLOT_BG': '#181825',
+    'GRID_ALPHA': 0.3,
+    'CHANNELS': [
+        '#a6e3a1',    # 소프트 그린
+        '#f38ba8',    # 로즈 핑크
+        '#89b4fa',    # 스카이 블루
+        '#f9e2af',    # 소프트 옐로우
+        '#94e2d5',    # 틸
+        '#cba6f7',    # 라벤더
+        '#fab387',    # 피치
+        '#89dceb',    # 사파이어
+        '#f5c2e7'     # 핑크
+    ],
+    # 크기 상수는 동일
+    'MAX_LEFT_PENEL_WIDTH': 280,
+    'RF_CONTROL_WIDTH': 280,
+    'RF_CONTROL_HEIGHT': 100,
+    'CHANNEL_GRID_WIDTH': 280,
+    'CHANNEL_GRID_HEIGHT': 180,
+    'TIMEBASE_WIDTH': 280,
+    'TIMEBASE_HEIGHT': 130,
+    'TRIGGER_WIDTH': 280,
+    'TRIGGER_HEIGHT': 180,
+    'MEASUREMENT_WIDTH': 280,
+    'MEASUREMENT_HEIGHT': 120,
+    'CONTROLS_WIDTH': 280,
+    'CONTROLS_HEIGHT': 105,
+    'MEASUREMENT_FONT_SIZE': 12,
+}
+"""
+
+class ChannelGridWidget(QWidget):
+    """9채널 선택 그리드 위젯"""
+    
+    channel_changed = pyqtSignal(int, bool)  # channel_index, enabled
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.active_channels = [True, True] + [False] * 7
+        self.display_mode = 'multi'
+        self.buttons = []
+        self.channel_names = [
+            "Fwd Pwr", "Ref Pwr", "Del Pwr", "Frequency", 
+            "Gamma", "R Gamma", "I Gamma", "RF Phase", "Temp"
+        ]
+        self.init_ui()
+        
+    def init_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(5)
+        
+        grid_group = QGroupBox("Channel Selection")
+        grid_group.setFixedSize(COLORS['CHANNEL_GRID_WIDTH'], COLORS['CHANNEL_GRID_HEIGHT'])
+        grid_layout = QGridLayout(grid_group)
+        grid_layout.setContentsMargins(5, 5, 5, 15)
+        grid_layout.setSpacing(1)
+        
+        grid_layout.setHorizontalSpacing(1)  # 좌우 간격 1px
+        grid_layout.setVerticalSpacing(10)    # 위아래 간격 5px (또는 원하는 값)
+        
+        for i in range(9):
+            btn = QPushButton(f"CH{i+1}\n{self.channel_names[i]}")
+            btn.setCheckable(True)
+            btn.setChecked(self.active_channels[i])
+            btn.setFixedSize(80, 50)
+            btn.clicked.connect(lambda checked, idx=i: self.toggle_channel(idx, checked))
+            
+            btn.setStyleSheet(f"""
+                QPushButton {{
+                    background-color: {COLORS['BUTTON_BG']};
+                    border: 2px solid {COLORS['BUTTON_BORDER']};
+                    color: {COLORS['BUTTON_TEXT']};
+                    font-size: 12px;
+                    border-radius: 3px;
+                }}
+                QPushButton:checked {{
+                    border-color: {COLORS['CHANNELS'][i]};
+                    background-color: rgba({self._hex_to_rgb(COLORS['CHANNELS'][i])}, 0.3);
+                    color: {COLORS['CHANNELS'][i]};
+                    font-weight: bold;
+                }}
+                QPushButton:hover {{
+                    border-color: {COLORS['BUTTON_HOVER_BORDER']};
+                    background-color: {COLORS['BUTTON_HOVER_BG']};
+                }}
+            """)
+            
+            grid_layout.addWidget(btn, i // 3, i % 3)
+            self.buttons.append(btn)
+            
+        layout.addWidget(grid_group)
+        self.info_label = QLabel("Active: 2/9 channels")
+        layout.addWidget(self.info_label)
+        self.update_info()
+    
+    def _hex_to_rgb(self, hex_color):
+        hex_color = hex_color.lstrip('#')
+        return ','.join(str(int(hex_color[i:i+2], 16)) for i in (0, 2, 4))
+    
+    def toggle_channel(self, channel_idx, checked):
+        self.active_channels[channel_idx] = checked
+        self.channel_changed.emit(channel_idx, self.active_channels[channel_idx])
+        self.update_info()
+    
+    def update_buttons(self):
+        for i, btn in enumerate(self.buttons):
+            btn.setChecked(self.active_channels[i])
+    
+    def update_info(self):
+        active_count = sum(self.active_channels)
+        self.info_label.setText(f"Active: {active_count}/9 channels")
+
+class TimebaseWidget(QWidget):
+    """시간축 컨트롤 위젯"""
+    
+    timebase_changed = pyqtSignal(str)
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.current_timebase = '1s'
+        self.init_ui()
+    
+    def init_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(5)
+        
+        group = QGroupBox("Time Base")
+        group.setFixedSize(COLORS['TIMEBASE_WIDTH'], COLORS['TIMEBASE_HEIGHT'])
+        group_layout = QVBoxLayout(group)
+        group_layout.setContentsMargins(5, 5, 5, 5)
+        group_layout.setSpacing(5)
+        
+        self.value_label = QLabel(f"Current: {self.current_timebase}/div")
+        self.value_label.setAlignment(Qt.AlignCenter)
+        group_layout.addWidget(self.value_label)
+        
+        button_layout = QGridLayout()
+        button_layout.setSpacing(5)
+        times = ['100ms', '500ms', '1s', '2s', '5s', '10s', '30s', '1m']
+        
+        self.button_group = QButtonGroup()
+        
+        for i, time_val in enumerate(times):
+            btn = QPushButton(time_val)
+            btn.setCheckable(True)
+            btn.setFixedSize(60, 30)
+            if time_val == self.current_timebase:
+                btn.setChecked(True)
+            
+            btn.clicked.connect(lambda checked, t=time_val: self.set_timebase(t))
+            self.button_group.addButton(btn)
+            button_layout.addWidget(btn, i // 4, i % 4)
+        
+        group_layout.addLayout(button_layout)
+        layout.addWidget(group)
+    
+    def set_timebase(self, timebase):
+        self.current_timebase = timebase
+        self.value_label.setText(f"Current: {timebase}/div")
+        self.timebase_changed.emit(timebase)
+
+class TriggerWidget(QWidget):
+    """트리거 제어 위젯"""
+    
+    trigger_changed = pyqtSignal(dict)
+
+    def __init__(self, channel_names, parent=None):
+        super().__init__(parent)
+        self.channel_names = channel_names
+        self.init_ui()
+
+    def init_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(5)
+        
+        group = QGroupBox("Trigger")
+        group.setFixedSize(COLORS['TRIGGER_WIDTH'], COLORS['TRIGGER_HEIGHT'])
+        g_layout = QVBoxLayout(group)
+        g_layout.setContentsMargins(5, 5, 5, 5)
+        g_layout.setSpacing(5)
+
+        mode_layout = QHBoxLayout()
+        mode_layout.setSpacing(5)
+        self.mode_group = QButtonGroup()
+        self.auto_btn = QPushButton("Auto")
+        self.normal_btn = QPushButton("Normal")
+        self.single_btn = QPushButton("Single")
+        for btn in [self.auto_btn, self.normal_btn, self.single_btn]:
+            btn.setCheckable(True)
+            self.mode_group.addButton(btn)
+        self.auto_btn.setChecked(True)
+        mode_layout.addWidget(self.auto_btn)
+        mode_layout.addWidget(self.normal_btn)
+        mode_layout.addWidget(self.single_btn)
+        g_layout.addLayout(mode_layout)
+
+        source_layout = QHBoxLayout()
+        source_layout.setSpacing(5)
+        source_label = QLabel("Source:")
+        self.source_combo = QComboBox()
+        self.source_combo.addItems(self.channel_names)
+        source_layout.addWidget(source_label)
+        source_layout.addWidget(self.source_combo)
+        g_layout.addLayout(source_layout)
+
+        type_layout = QHBoxLayout()
+        type_layout.setSpacing(5)
+        type_label = QLabel("Type:")
+        self.type_combo = QComboBox()
+        self.type_combo.addItems(["Rising Edge", "Falling Edge", "Level"])
+        type_layout.addWidget(type_label)
+        type_layout.addWidget(self.type_combo)
+        g_layout.addLayout(type_layout)
+
+        level_layout = QHBoxLayout()
+        level_layout.setSpacing(5)
+        level_label = QLabel("Level:")
+        self.level_spin = QDoubleSpinBox()
+        self.level_spin.setRange(-1e6, 1e6)
+        self.level_spin.setValue(0.0)
+        level_layout.addWidget(level_label)
+        level_layout.addWidget(self.level_spin)
+        g_layout.addLayout(level_layout)
+
+        layout.addWidget(group)
+
+        self.source_combo.currentIndexChanged.connect(self.emit_change)
+        self.type_combo.currentIndexChanged.connect(self.emit_change)
+        self.level_spin.valueChanged.connect(self.emit_change)
+        for btn in [self.auto_btn, self.normal_btn, self.single_btn]:
+            btn.clicked.connect(self.emit_change)
+
+    def get_settings(self):
+        mode = "auto" if self.auto_btn.isChecked() else "normal" if self.normal_btn.isChecked() else "single"
+        source = self.source_combo.currentIndex()
+        trig_type = "rising" if self.type_combo.currentText() == "Rising Edge" else \
+                    "falling" if self.type_combo.currentText() == "Falling Edge" else "level"
+        level = self.level_spin.value()
+        return {"mode": mode, "source": source, "type": trig_type, "level": level}
+
+    def emit_change(self):
+        self.trigger_changed.emit(self.get_settings())
+
+class MeasurementControlWidget(QWidget):
+    """측정 영역 제어 위젯"""
+    
+    measurement_mode_changed = pyqtSignal(str)
+    reset_measurement = pyqtSignal()
+    snap_to_peak = pyqtSignal(int)
+    
+    def __init__(self, channel_names, parent=None):
+        super().__init__(parent)
+        self.channel_names = channel_names
+        self.current_mode = "floating"
+        self.init_ui()
+    
+    def init_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(5)
+        
+        group = QGroupBox("Measurement Control")
+        group.setFixedSize(COLORS['MEASUREMENT_WIDTH'], COLORS['MEASUREMENT_HEIGHT'])
+        group_layout = QVBoxLayout(group)
+        group_layout.setContentsMargins(5, 5, 5, 5)
+        group_layout.setSpacing(5)
+        
+        mode_layout = QHBoxLayout()
+        mode_layout.setSpacing(5)
+        mode_label = QLabel("Mode:")
+        self.float_btn = QPushButton("Float")
+        self.fixed_btn = QPushButton("Fixed")
+        
+        self.float_btn.setCheckable(True)
+        self.fixed_btn.setCheckable(True)
+        self.float_btn.setChecked(True)
+        
+        self.mode_group = QButtonGroup()
+        self.mode_group.addButton(self.float_btn)
+        self.mode_group.addButton(self.fixed_btn)
+        
+        self.float_btn.clicked.connect(lambda: self.set_measurement_mode("floating"))
+        self.fixed_btn.clicked.connect(lambda: self.set_measurement_mode("fixed"))
+        
+        mode_layout.addWidget(mode_label)
+        mode_layout.addWidget(self.float_btn)
+        mode_layout.addWidget(self.fixed_btn)
+        group_layout.addLayout(mode_layout)
+        
+        control_layout = QHBoxLayout()
+        control_layout.setSpacing(5)
+        
+        self.reset_btn = QPushButton("Reset")
+        self.reset_btn.clicked.connect(self.reset_measurement.emit)
+        
+        self.center_btn = QPushButton("Center")
+        self.center_btn.clicked.connect(self.center_measurement)
+        
+        control_layout.addWidget(self.reset_btn)
+        control_layout.addWidget(self.center_btn)
+        group_layout.addLayout(control_layout)
+        
+        snap_layout = QHBoxLayout()
+        snap_layout.setSpacing(5)
+        snap_label = QLabel("Snap to Peak:")
+        self.snap_combo = QComboBox()
+        self.snap_combo.addItems([f"CH{i+1}" for i in range(9)])
+        self.snap_btn = QPushButton("Go")
+        self.snap_btn.clicked.connect(self.on_snap_to_peak)
+        
+        snap_layout.addWidget(snap_label)
+        snap_layout.addWidget(self.snap_combo)
+        snap_layout.addWidget(self.snap_btn)
+        group_layout.addLayout(snap_layout)
+        
+        layout.addWidget(group)
+    
+    def set_measurement_mode(self, mode):
+        self.current_mode = mode
+        self.measurement_mode_changed.emit(mode)
+        if mode == "floating":
+            self.float_btn.setChecked(True)
+        else:
+            self.fixed_btn.setChecked(True)
+    
+    def center_measurement(self):
+        self.reset_measurement.emit()
+    
+    def on_snap_to_peak(self):
+        channel_idx = self.snap_combo.currentIndex()
+        self.snap_to_peak.emit(channel_idx)
+
+class UnifiedPlotWidget(QWidget):
+    """통합 플롯 위젯"""
+    
+    trigger_level_changed = pyqtSignal(float)
+    stop_acquisition_signal = pyqtSignal()
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.active_channels = [True, True] + [False] * 7
+        self.display_mode = 'multi'
+        #self.buffer_size = 500  # 줄여서 부하 감소
+        self.buffer_size = 12001  # 10 그리드 그리드당 1분 600초에대한 버퍼
+        self.time_data = deque(maxlen=self.buffer_size)
+        self.channel_data = [deque(maxlen=self.buffer_size) for _ in range(9)]
+        self.pre_time_data = deque(maxlen=self.buffer_size)
+        self.pre_channel_data = [deque(maxlen=self.buffer_size) for _ in range(9)]
+        self.display_time = []
+        self.display_channel_data = [[] for _ in range(9)]
+        self.trigger_settings = None
+        self.trigger_mode = "auto"
+        self.acquiring = False
+        self.triggered = False
+        self.last_sweep_time = 0
+        self.total_time = 10.0
+        self.pre_time = 5.0
+        self.post_time = 5.0
+        self._updating = False
+        self.measurement_mode = "floating"
+        self.fixed_measurement_range = None
+        self.last_time_range = None
+        
+        # 고정 간격 적용을 위한 변수 추가 (1번 해결 방법)
+        self.sample_interval = 0.05  # 50ms = 0.05초
+        self.sample_count = 0  # 샘플 카운터
+        self.pre_sample_count = 0  # pre 버퍼용 카운터
+        
+        self.channel_names = [
+            "Forward Power", "Reflect Power", "Delivery Power", "Frequency", 
+            "Gamma", "Real Gamma", "Image Gamma", "RF Phase", "Temperature"
+        ]
+        self.channel_units = [
+            "W", "W", "W", "MHz", "", "", "", "°", "°C"
+        ]
+        self.init_ui()
+        
+    def init_ui(self):
+        layout = QVBoxLayout(self)
+
+        # 선큰 플롯을 프레임으로 감싸기
+        plot_frame = QFrame()
+        
+        ##plot_frame.setFrameStyle(QFrame.StyledPanel | QFrame.Sunken)
+        plot_frame.setStyleSheet("""
+            QFrame {
+                border: 2px inset #555555;
+                border-radius: 3px;
+                background-color: #CCCCCC;
+                margin: 2px;
+            }
+        """)
+        
+        plot_frame.setFrameStyle(QFrame.StyledPanel | QFrame.Sunken)
+        frame_layout = QVBoxLayout(plot_frame)
+        frame_layout.setContentsMargins(3, 3, 3, 3)  # 아래쪽 여백 늘리기
+        ##
+        
+        self.plot_widget = pg.PlotWidget()
+        self.plot_widget.getPlotItem().getAxis('bottom').setStyle(tickLength=-10)
+        
+        plotItem = self.plot_widget.getPlotItem()
+        plotItem.setContentsMargins(10, 10, 10, 15)  # 아래쪽 여백 늘리기
+        
+        self.plot_widget.setBackground(COLORS['PLOT_BG'])
+        self.plot_widget.showGrid(x=True, y=True, alpha=COLORS['GRID_ALPHA'])
+        self.plot_widget.setLabel('left', 'Value', color=COLORS['TEXT'])
+        self.plot_widget.setLabel('bottom', 'Time', units='s', color=COLORS['TEXT'])
+        self.plot_widget.setClipToView(True)
+        
+        self.plot_lines = []
+        for i in range(9):
+            line = self.plot_widget.plot(
+                pen=pg.mkPen(color=COLORS['CHANNELS'][i], width=2),
+                name=f"CH{i+1}: {self.channel_names[i]}",
+                downsample=True,  # 다운샘플링 활성화
+                downsampleMethod='peak'
+            )
+            line.setVisible(self.active_channels[i])
+            self.plot_lines.append(line)
+        
+        frame_layout.addWidget(self.plot_widget)  # 선큰 프레임에 추가
+        layout.addWidget(plot_frame)
+        #layout.addWidget(self.plot_widget)
+        
+        self.legend = self.plot_widget.addLegend()
+        for i in range(9):
+            if self.active_channels[i]:
+                self.legend.addItem(self.plot_lines[i], f"CH{i+1}: {self.channel_names[i]}")
+        
+        self.info_label = QLabel("Waiting for data...")
+        layout.addWidget(self.info_label)
+        
+        self.region = pg.LinearRegionItem([-1, 1])
+        self.plot_widget.addItem(self.region)
+        self.region.sigRegionChangeFinished.connect(self.update_measurements)
+        
+        self.trigger_level_line = pg.InfiniteLine(pos=0, angle=0, movable=True, pen=pg.mkPen('y', style=Qt.DashLine))
+        self.plot_widget.addItem(self.trigger_level_line)
+        self.trigger_level_line.sigPositionChanged.connect(self.on_trigger_level_dragged)
+        
+        self.trigger_pos_line = pg.InfiniteLine(pos=0, angle=90, movable=True, pen=pg.mkPen('r', style=Qt.DashLine))
+        self.plot_widget.addItem(self.trigger_pos_line)
+        self.trigger_pos_line.sigPositionChanged.connect(self.on_trigger_pos_dragged)
+        
+        self.trigger_text = pg.TextItem(text="", color=(255, 255, 0), anchor=(0, 0))
+        self.plot_widget.addItem(self.trigger_text)
+        
+        self.measure_group = QGroupBox("Measurements")
+        #self.measure_group.setMinimumHeight(250)
+        measure_layout = QVBoxLayout(self.measure_group)
+        self.measure_labels = []
+        for i in range(9):
+            lbl = QLabel()
+            lbl.setWordWrap(True)
+            lbl.setVisible(self.active_channels[i])
+            lbl.setStyleSheet(f"""
+                QLabel {{
+                    color: {COLORS['CHANNELS'][i]};
+                    font-size: {COLORS['MEASUREMENT_FONT_SIZE']}px;
+                    font-weight: normal;
+                    padding: 0px;
+                    margin: 0px;
+                }}
+            """)
+            #print(f"CH{i+1} label font-size set to {COLORS['MEASUREMENT_FONT_SIZE']}px")
+            measure_layout.addWidget(lbl)
+            self.measure_labels.append(lbl)
+        layout.addWidget(self.measure_group)
+        
+        # 렌더링 타이머 추가
+        self.render_timer = QTimer(self)
+        self.render_timer.timeout.connect(self.render_plots)
+        self.render_timer.start(33)  # ~30Hz
+        
+        from PyQt5.QtWidgets import QApplication
+        QApplication.processEvents()
+    
+    def on_trigger_level_dragged(self, line):
+        new_level = line.value()
+        self.trigger_level_changed.emit(new_level)
+    
+    def on_trigger_pos_dragged(self, line):
+        if self._updating:
+            return
+        self._updating = True
+        new_pos = line.value()
+        shift = new_pos
+        self.display_time = [t - shift for t in self.display_time]
+        current_min, current_max = self.plot_widget.getAxis('bottom').range
+        self.plot_widget.setXRange(current_min - shift, current_max - shift, padding=0)
+        line.setValue(0)
+        self.pre_time = max(-current_min, 0.01)
+        self.post_time = max(current_max, 0.01)
+        self.total_time = self.pre_time + self.post_time
+        self.render_plots()
+        print(f"Trigger point and zero point moved by shift: {shift}, new pre_time: {self.pre_time}, post_time: {self.post_time}")
+        self._updating = False
+    
+    def update_trigger_display(self):
+        if self.trigger_settings is None or self.trigger_mode == "auto":
+            self.trigger_level_line.setVisible(False)
+            self.trigger_pos_line.setVisible(False)
+            self.trigger_text.setVisible(False)
+            return
+        level = self.trigger_settings["level"]
+        trig_type = self.trigger_settings["type"]
+        source = self.trigger_settings["source"]
+        self.trigger_level_line.setValue(level)
+        self.trigger_level_line.setVisible(True)
+        if self.triggered:
+            self.trigger_pos_line.setValue(0)
+            self.trigger_pos_line.setVisible(True)
+            if self.display_time:
+                min_time = min(self.display_time)
+                max_time = max(self.display_time)
+                self.trigger_pos_line.setBounds([min_time, max_time])
+        else:
+            self.trigger_pos_line.setVisible(False)
+        text = f"Trigger: {trig_type.upper()} at {level:.2f} on CH{source+1}"
+        self.trigger_text.setText(text)
+        self.trigger_text.setPos(0, 
+                               level + 0.1 * (max(self.display_channel_data[source]) - min(self.display_channel_data[source])) 
+                               if self.display_channel_data[source] else 0)
+        self.trigger_text.setVisible(True)
+    
+    def set_measurement_mode(self, mode):
+        self.measurement_mode = mode
+        if mode == "fixed":
+            current_range = self.region.getRegion()
+            self.fixed_measurement_range = current_range
+        else:
+            self.fixed_measurement_range = None
+    
+    def reset_measurement_region(self):
+        if self.display_time and len(self.display_time) > 0:
+            time_span = max(self.display_time) - min(self.display_time)
+            center = (max(self.display_time) + min(self.display_time)) / 2
+            half_width = time_span * 0.1
+            new_range = [center - half_width, center + half_width]
+            self.region.setRegion(new_range)
+            if self.measurement_mode == "fixed":
+                self.fixed_measurement_range = new_range
+        else:
+            self.region.setRegion([-1, 1])
+    
+    def snap_to_peak(self, channel_idx):
+        if (not self.active_channels[channel_idx] or 
+            not self.display_channel_data[channel_idx] or
+            len(self.display_channel_data[channel_idx]) == 0):
+            return
+        try:
+            data = np.asarray(self.display_channel_data[channel_idx])  # np.array -> np.asarray
+            time = np.asarray(self.display_time)  # np.array -> np.asarray
+            if len(data) == 0 or len(time) == 0:
+                return
+            peak_idx = np.argmax(data)
+            peak_time = time[peak_idx]
+            time_span = max(time) - min(time)
+            half_width = max(time_span * 0.05, 0.1)
+            new_range = [peak_time - half_width, peak_time + half_width]
+            self.region.setRegion(new_range)
+            if self.measurement_mode == "fixed":
+                self.fixed_measurement_range = new_range
+        except Exception as e:
+            print(f"Error in snap_to_peak: {e}")
+    
+    def adjust_measurement_region(self):
+        if not self.display_time or len(self.display_time) == 0:
+            return
+        try:
+            current_time_range = [min(self.display_time), max(self.display_time)]
+            if self.measurement_mode == "floating":
+                if self.last_time_range is None:
+                    time_span = current_time_range[1] - current_time_range[0]
+                    if time_span > 0:
+                        new_end = current_time_range[1]
+                        new_start = new_end - (time_span * 0.2)
+                        self.region.setRegion([new_start, new_end])
+                elif (self.last_time_range and 
+                      len(self.last_time_range) == 2 and 
+                      current_time_range != self.last_time_range):
+                    if self.last_time_range[1] != current_time_range[1]:
+                        current_region = self.region.getRegion()
+                        time_shift = current_time_range[1] - self.last_time_range[1]
+                        new_region = [current_region[0] + time_shift, current_region[1] + time_shift]
+                        self.region.setRegion(new_region)
+            elif self.measurement_mode == "fixed" and self.fixed_measurement_range:
+                self.region.setRegion(self.fixed_measurement_range)
+            self.last_time_range = current_time_range.copy()
+        except Exception as e:
+            print(f"Error in adjust_measurement_region: {e}")
+    
+    def update_channels(self, data_array, timestamp):
+        """채널 데이터 업데이트 - 고정 간격 적용"""
+        try:
+            # 고정 간격으로 relative_time 계산 (timestamp 무시)
+            relative_time = self.sample_count * self.sample_interval
+            self.sample_count += 1
+
+            if self.trigger_settings is None:
+                # 비트리거 모드: 기본 버퍼 관리
+                while self.time_data and relative_time - self.time_data[0] > self.total_time:
+                    self.time_data.popleft()
+                    for i in range(9):
+                        if len(self.channel_data[i]) > 0:
+                            self.channel_data[i].popleft()
+                self.time_data.append(relative_time)
+                for i in range(9):
+                    self.channel_data[i].append(data_array[i])
+                self.display_time = list(self.time_data)
+                for i in range(9):
+                    self.display_channel_data[i] = list(self.channel_data[i])
+                self.adjust_measurement_region()
+                self.update_trigger_display()
+                if self.display_time:
+                    max_time = max(self.display_time)
+                    self.plot_widget.setXRange(max_time - self.total_time, max_time, padding=0)
+            
+            else:
+                # 트리거 모드: pre/post 버퍼에 고정 간격 적용
+                if not self.acquiring:
+                    return
+                
+                # pre 버퍼: 고정 간격 pre_relative_time
+                pre_relative_time = self.pre_sample_count * self.sample_interval
+                self.pre_sample_count += 1
+                
+                while self.pre_time_data and pre_relative_time - self.pre_time_data[0] > self.pre_time:
+                    self.pre_time_data.popleft()
+                    for i in range(9):
+                        if len(self.pre_channel_data[i]) > 0:
+                            self.pre_channel_data[i].popleft()
+                self.pre_time_data.append(pre_relative_time)
+                for i in range(9):
+                    self.pre_channel_data[i].append(data_array[i])
+                
+                trig_type = self.trigger_settings["type"]
+                level = self.trigger_settings["level"]
+                
+                if self.trigger_mode == "auto" and pre_relative_time - self.last_sweep_time > 0.05 and not self.triggered:
+                    self.triggered = True
+                    self.display_time = list(self.pre_time_data)
+                    for i in range(9):
+                        self.display_channel_data[i] = list(self.pre_channel_data[i])
+                    self.last_sweep_time = pre_relative_time
+                    print(f"Auto trigger occurred at time: {pre_relative_time}, value: {data_array[self.trigger_settings['source']]}")
+                
+                if not self.triggered:
+                    if len(self.pre_time_data) < 2:
+                        return
+                    source = self.trigger_settings["source"]
+                    if len(self.pre_channel_data[source]) >= 2:
+                        value = self.pre_channel_data[source][-1]
+                        prev_value = self.pre_channel_data[source][-2]
+                        triggered = False
+                        if trig_type == "rising" and prev_value <= level and value > level:
+                            triggered = True
+                        elif trig_type == "falling" and prev_value >= level and value < level:
+                            triggered = True
+                        elif trig_type == "level" and value > level:
+                            triggered = True
+                        if triggered:
+                            self.triggered = True
+                            self.display_time = list(self.pre_time_data)
+                            for i in range(9):
+                                self.display_channel_data[i] = list(self.pre_channel_data[i])
+                            print(f"Trigger occurred at time: {pre_relative_time}, value: {value}, type: {trig_type}")
+                
+                if self.triggered:
+                    # post 버퍼: 트리거 후에도 고정 간격 추가
+                    post_relative_time = self.sample_count * self.sample_interval  # 전체 카운터 사용
+                    self.display_time.append(post_relative_time)
+                    for i in range(9):
+                        self.display_channel_data[i].append(data_array[i])
+                    if post_relative_time >= self.post_time:
+                        self.render_plots()
+                        self.plot_widget.setXRange(-self.pre_time, self.post_time, padding=0)
+                        self.last_sweep_time = post_relative_time
+                        if self.trigger_mode == "single":
+                            self.acquiring = False
+                            self.stop_acquisition_signal.emit()
+                            print(f"Single mode stopped, maintaining pre_time: {self.pre_time}, post_time: {self.post_time}")
+                        self.triggered = False
+            
+            active_count = sum(self.active_channels)
+            self.info_label.setText(
+                f"Active Channels: {active_count}/9 | "
+                f"Buffer: {len(self.time_data)}/{self.buffer_size} | "
+                f"Mode: {self.display_mode.upper()} | "
+                f"Measure: {self.measurement_mode.upper()} | "
+                f"Pre/Post: {self.pre_time:.2f}/{self.post_time:.2f}s"
+            )
+        except Exception as e:
+            print(f"Error in update_channels: {e}")
+    
+    def update_plots(self):
+        """플롯 업데이트"""
+        try:
+            for i in range(9):
+                if self.active_channels[i] and self.display_time and len(self.display_time) > 0:
+                    if len(self.display_channel_data[i]) == len(self.display_time):
+                        self.plot_lines[i].setData(self.display_time, self.display_channel_data[i])
+                    else:
+                        self.plot_lines[i].setData([], [])
+                else:
+                    self.plot_lines[i].setData([], [])
+        except Exception as e:
+            print(f"Error in update_plots: {e}")
+    
+    def update_measurements(self):
+        """측정값 업데이트"""
+        try:
+            minX, maxX = self.region.getRegion()
+            if not self.display_time or len(self.display_time) == 0:
+                return
+            time_array = np.asarray(self.display_time)
+            for i in range(9):
+                if not self.active_channels[i]:
+                    continue
+                if (not self.display_channel_data[i] or 
+                    len(self.display_channel_data[i]) == 0 or
+                    len(self.display_channel_data[i]) != len(time_array)):
+                    self.measure_labels[i].setText(f"CH{i+1}: No data")
+                    continue
+                data_array = np.asarray(self.display_channel_data[i])
+                mask = (time_array >= minX) & (time_array <= maxX)
+                if np.sum(mask) < 1:
+                    self.measure_labels[i].setText(f"CH{i+1}: No data in range")
+                    continue
+                selected_time = time_array[mask]
+                selected_data = data_array[mask]
+                if len(selected_data) == 0:
+                    self.measure_labels[i].setText(f"CH{i+1}: No data in range")
+                    continue
+                min_val = np.min(selected_data)
+                max_val = np.max(selected_data)
+                mean_val = np.mean(selected_data)
+                p2p = max_val - min_val
+                rms = np.sqrt(np.mean(selected_data**2))
+                delta_t = selected_time[-1] - selected_time[0] if len(selected_time) > 1 else 0
+                delta_t = delta_t + 0.05
+                n_points = len(selected_time)  # 추가: 데이터 포인트 수 계산
+                #text = f"CH{i+1}: Min={min_val:.2f} Max={max_val:.2f} Mean={mean_val:.2f} P-P={p2p:.2f} RMS={rms:.2f} {self.channel_units[i]}, Δt={delta_t:.3f}s, ΔPoints={n_points}"  # 수정: ΔPoints 추가
+                text = f"CH{i+1}: Min={min_val:9.3f}  Max={max_val:9.3f}  Mean={mean_val:9.3f}  P-P={p2p:9.3f}  RMS={rms:9.3f} {self.channel_units[i]}  Δt={delta_t:5.2f}s, ΔPoints={n_points}"  # 수정: ΔPoints 추가
+                self.measure_labels[i].setText(text)
+        except Exception as e:
+            print(f"Error in update_measurements: {e}")
+    
+    def render_plots(self):
+        """플롯과 측정값 렌더링"""
+        try:
+            self.update_plots()
+            self.update_measurements()
+        except Exception as e:
+            print(f"Error in render_plots: {e}")
+    
+    def set_channel_active(self, channel_idx, active):
+        try:
+            self.active_channels[channel_idx] = active
+            self.plot_lines[channel_idx].setVisible(active)
+            self.measure_labels[channel_idx].setVisible(active)
+            self.measure_labels[channel_idx].setStyleSheet(f"""
+                QLabel {{
+                    color: {COLORS['CHANNELS'][channel_idx]};
+                    font-size: {COLORS['MEASUREMENT_FONT_SIZE']}px;
+                    font-weight: normal;
+                    padding: 0px;
+                    margin: 0px;
+                }}
+            """)
+            #print(f"CH{channel_idx+1} label font-size set to {COLORS['MEASUREMENT_FONT_SIZE']}px, active={active}")
+            name = f"CH{channel_idx+1}: {self.channel_names[channel_idx]}"
+            if active:
+                self.legend.addItem(self.plot_lines[channel_idx], name)
+            else:
+                self.legend.removeItem(name)
+        except Exception as e:
+            print(f"Error in set_channel_active: {e}")
+    
+    def set_display_mode(self, mode):
+        self.display_mode = mode
+    
+    def clear_data(self):
+        try:
+            self.time_data.clear()
+            for channel in self.channel_data:
+                channel.clear()
+            self.pre_time_data.clear()
+            for channel in self.pre_channel_data:
+                channel.clear()
+            self.display_time = []
+            for i in range(9):
+                self.display_channel_data[i] = []
+            self.pre_time = self.total_time / 2
+            self.post_time = self.total_time / 2
+            self.sample_count = 0  # 카운터 리셋
+            self.pre_sample_count = 0
+            self.render_plots()
+            self.region.setRegion([-1, 1])
+            self.fixed_measurement_range = None
+            self.last_time_range = None
+        except Exception as e:
+            print(f"Error in clear_data: {e}")
+
+    def stop_acquisition(self):
+        self.acquiring = False
+        self.stop_acquisition_signal.emit()
+        #print(f"Acquisition stopped, maintaining pre_time: {self.pre_time}, post_time: {self.post_time}")
+
+class OscilloscopeView(QWidget):
+    """오실로스코프 뷰 메인 위젯"""
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.parent_window = parent
+        self.rf_running = False
+        self.data_queue = deque(maxlen=100)  # status_data 큐
+        self.batch_size = 10  # 배치 처리 크기
+        self.update_interval = 50  # ms (20Hz)
+        self.init_ui()
+        self.setup_connections()
+        self.update_timer = QTimer(self)
+        self.update_timer.timeout.connect(self.process_batch)
+        self.update_timer.start(self.update_interval)
+        
+    def init_ui(self):
+        layout = QHBoxLayout(self)
+        control_panel = self.create_control_panel()
+        control_panel.setFixedWidth(COLORS['MAX_LEFT_PENEL_WIDTH'])
+        control_panel.setFixedHeight(COLORS['RF_CONTROL_HEIGHT'] + 
+                                     COLORS['CHANNEL_GRID_HEIGHT'] + 
+                                     COLORS['TIMEBASE_HEIGHT'] + 
+                                     COLORS['TRIGGER_HEIGHT'] + 
+                                     COLORS['MEASUREMENT_HEIGHT'] + 
+                                     COLORS['CONTROLS_HEIGHT'] + 79)
+                                     
+        layout.addWidget(control_panel)
+        self.plot_widget = UnifiedPlotWidget()
+        layout.addWidget(self.plot_widget, 1)
+        self.apply_styles()
+    
+    def create_control_panel(self):
+        panel = QWidget()
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(10)
+        
+        rf_group = QGroupBox("RF Control")
+        rf_group.setFixedSize(COLORS['RF_CONTROL_WIDTH'], COLORS['RF_CONTROL_HEIGHT'])
+        rf_layout = QHBoxLayout(rf_group)
+        rf_layout.setContentsMargins(10, 10, 10, 10)
+        rf_layout.setSpacing(10)
+        self.run_btn = QPushButton("RUN")
+        self.stop_btn = QPushButton("STOP")
+        self.run_btn.setFixedHeight(40)
+        self.stop_btn.setFixedHeight(40)
+        self.run_btn.clicked.connect(self.start_acquisition)
+        self.stop_btn.clicked.connect(self.stop_acquisition)
+        rf_layout.addWidget(self.run_btn)
+        rf_layout.addWidget(self.stop_btn)
+        layout.addWidget(rf_group)
+        
+        self.channel_grid = ChannelGridWidget()
+        layout.addWidget(self.channel_grid)
+        
+        self.timebase_widget = TimebaseWidget()
+        layout.addWidget(self.timebase_widget)
+        
+        self.trigger_widget = TriggerWidget(self.channel_grid.channel_names)
+        layout.addWidget(self.trigger_widget)
+        
+        self.measurement_control = MeasurementControlWidget(self.channel_grid.channel_names)
+        layout.addWidget(self.measurement_control)
+        
+        controls_group = QGroupBox("Controls")
+        controls_group.setFixedSize(COLORS['CONTROLS_WIDTH'], COLORS['CONTROLS_HEIGHT'])
+        controls_layout = QVBoxLayout(controls_group)
+        controls_layout.setContentsMargins(10, 10, 10, 10)
+        controls_layout.setSpacing(10)
+        
+        # 버튼들을 가로로 배치
+        button_layout = QHBoxLayout()
+        button_layout.setSpacing(10)
+
+        clear_btn = QPushButton("Clear Data")
+        clear_btn.clicked.connect(self.clear_data)
+
+        auto_range_btn = QPushButton("Auto Range")
+        auto_range_btn.clicked.connect(self.auto_range)
+
+        button_layout.addWidget(clear_btn)
+        button_layout.addWidget(auto_range_btn)
+        controls_layout.addLayout(button_layout)
+        
+        
+        layout.addWidget(controls_group)
+        
+        layout.addStretch()
+        return panel
+    
+    def auto_range(self):
+        """플롯 자동 범위 조정"""
+        self.plot_widget.plot_widget.getViewBox().autoRange()
+    
+    def setup_connections(self):
+        self.channel_grid.channel_changed.connect(self.on_channel_changed)
+        self.timebase_widget.timebase_changed.connect(self.on_timebase_changed)
+        self.trigger_widget.trigger_changed.connect(self.on_trigger_changed)
+        self.measurement_control.measurement_mode_changed.connect(self.plot_widget.set_measurement_mode)
+        self.measurement_control.reset_measurement.connect(self.plot_widget.reset_measurement_region)
+        self.measurement_control.snap_to_peak.connect(self.plot_widget.snap_to_peak)
+        self.plot_widget.trigger_level_changed.connect(self.on_trigger_level_dragged)
+        self.plot_widget.stop_acquisition_signal.connect(self.stop_acquisition)
+    
+    def on_trigger_level_dragged(self, new_level):
+        self.trigger_widget.level_spin.setValue(new_level)
+    
+    def apply_styles(self):
+        self.setStyleSheet(f"""
+            QWidget {{
+                background-color: {COLORS['BACKGROUND']};
+                color: {COLORS['TEXT']};
+                font-family: {SELECTED_FONT};
+            }}
+            QGroupBox {{
+                font-weight: bold;
+                border: 1px solid {COLORS['GROUPBOX_BORDER']};
+                border-radius: 5px;
+                margin-top: 1ex;
+                padding-top: 10px;
+                color: {COLORS['GROUPBOX_TITLE']};
+            }}
+            QGroupBox::title {{
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 5px 0 5px;
+            }}
+            QPushButton {{
+                background-color: {COLORS['BUTTON_BG']};
+                border: 2px solid {COLORS['BUTTON_BORDER']};
+                color: {COLORS['BUTTON_TEXT']};
+                padding: 6px;
+                border-radius: 3px;
+                font-size: 12px;
+                font-weight: bold;
+            }}
+            QPushButton:hover {{
+                border-color: {COLORS['BUTTON_HOVER_BORDER']};
+                background-color: {COLORS['BUTTON_HOVER_BG']};
+            }}
+            QPushButton:checked {{
+                background-color: {COLORS['BUTTON_CHECKED_BG']};
+                border-color: {COLORS['BUTTON_CHECKED_BORDER']};
+            }}
+            QLabel {{
+                color: {COLORS['LABEL_TEXT']};
+                font-size: 15px;
+            }}
+            QComboBox {{
+                background-color: {COLORS['BUTTON_BG']};
+                border: 1px solid {COLORS['BUTTON_BORDER']};
+                border-radius: 3px;
+                padding: 2px 5px;
+                color: {COLORS['TEXT']};
+            }}
+            QComboBox::drop-down {{
+                border: none;
+            }}
+            QComboBox::down-arrow {{
+                image: none;
+                border-left: 5px solid transparent;
+                border-right: 5px solid transparent;
+                border-top: 5px solid {COLORS['TEXT']};
+            }}
+            QDoubleSpinBox {{
+                background-color: {COLORS['BUTTON_BG']};
+                border: 1px solid {COLORS['BUTTON_BORDER']};
+                border-radius: 3px;
+                padding: 2px 5px;
+                color: {COLORS['TEXT']};
+            }}
+        """)
+        self.run_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {COLORS['RUN_BUTTON_BG']};
+                border: 2px solid {COLORS['RUN_BUTTON_BORDER']};
+                color: {COLORS['TEXT']};
+                font-weight: bold;
+            }}
+            QPushButton:hover {{
+                background-color: {COLORS['RUN_BUTTON_HOVER']};
+            }}
+            QPushButton:pressed {{
+                background-color: {COLORS['RUN_BUTTON_PRESSED']};
+            }}
+            QPushButton:disabled {{
+                background-color: #333333;
+                color: #666666;
+                border-color: #555555;
+            }}
+        """)
+        self.stop_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {COLORS['STOP_BUTTON_BG']};
+                border: 2px solid {COLORS['STOP_BUTTON_BORDER']};
+                color: {COLORS['TEXT']};
+                font-weight: bold;
+            }}
+            QPushButton:hover {{
+                background-color: {COLORS['STOP_BUTTON_HOVER']};
+            }}
+            QPushButton:pressed {{
+                background-color: {COLORS['STOP_BUTTON_PRESSED']};
+            }}
+            QPushButton:disabled {{
+                background-color: #333333;
+                color: #666666;
+                border-color: #555555;
+            }}
+        """)
+    
+    def on_channel_changed(self, channel_idx, enabled):
+        self.plot_widget.set_channel_active(channel_idx, enabled)
+    
+    def on_timebase_changed(self, timebase):
+        try:
+            old_ratio = self.plot_widget.pre_time / self.plot_widget.total_time if self.plot_widget.total_time > 0 else 0.5
+            tb_sec = self.parse_timebase(timebase)
+            new_total = 10 * tb_sec
+            self.plot_widget.total_time = new_total
+            self.plot_widget.pre_time = old_ratio * new_total
+            self.plot_widget.post_time = new_total - self.plot_widget.pre_time
+            if len(self.plot_widget.time_data) > 0:
+                current_time = self.plot_widget.time_data[-1]
+                self.plot_widget.plot_widget.setXRange(current_time - new_total, current_time, padding=0)
+            elif self.plot_widget.trigger_settings:
+                self.plot_widget.plot_widget.setXRange(-self.plot_widget.pre_time, self.plot_widget.post_time, padding=0)
+        except Exception as e:
+            print(f"Error in on_timebase_changed: {e}")
+    
+    def parse_timebase(self, timebase):
+        try:
+            if 'ms' in timebase:
+                return float(timebase.replace('ms', '')) / 1000
+            elif 's' in timebase:
+                return float(timebase.replace('s', ''))
+            elif 'm' in timebase:
+                return float(timebase.replace('m', '')) * 60
+            return 1.0
+        except:
+            return 1.0
+    
+    def on_trigger_changed(self, settings):
+        try:
+            if settings["mode"] == "auto":
+                self.plot_widget.trigger_settings = None
+                self.plot_widget.trigger_mode = "auto"
+                self.plot_widget.clear_data()
+                if self.rf_running:
+                    self.plot_widget.acquiring = True
+            else:
+                self.plot_widget.trigger_settings = settings
+                self.plot_widget.trigger_mode = settings["mode"]
+                self.plot_widget.triggered = False
+                self.plot_widget.last_sweep_time = 0
+                if self.rf_running:
+                    self.plot_widget.acquiring = True
+            self.plot_widget.update_trigger_display()
+        except Exception as e:
+            print(f"Error in on_trigger_changed: {e}")
+    
+    def start_acquisition(self):
+        try:
+            self.rf_running = True
+            self.plot_widget.acquiring = True
+            self.plot_widget.triggered = False
+            self.plot_widget.last_sweep_time = 0
+            self.run_btn.setEnabled(False)
+            self.stop_btn.setEnabled(True)
+            self.data_queue.clear()
+            self.plot_widget.sample_count = 0  # 시작 시 카운터 리셋
+            self.plot_widget.pre_sample_count = 0
+            #print(f"Acquisition started, pre_time: {self.plot_widget.pre_time}, post_time: {self.plot_widget.post_time}")
+        except Exception as e:
+            print(f"Error in start_acquisition: {e}")
+    
+    def stop_acquisition(self):
+        try:
+            self.rf_running = False
+            self.plot_widget.acquiring = False
+            self.run_btn.setEnabled(True)
+            self.stop_btn.setEnabled(False)
+            self.data_queue.clear()
+            #print(f"Acquisition stopped, maintaining pre_time: {self.plot_widget.pre_time}, post_time: {self.plot_widget.post_time}")
+        except Exception as e:
+            print(f"Error in stop_acquisition: {e}")
+    
+    def clear_data(self):
+        self.plot_widget.clear_data()
+        self.data_queue.clear()
+    
+    def update_data(self, status_data):
+        if not self.rf_running:
+            return
+        try:
+            self.data_queue.append((status_data, time.time()))
+            if len(self.data_queue) >= self.batch_size:
+                self.process_batch()
+        except Exception as e:
+            print(f"Error in update_data: {e}")
+    
+    def process_batch(self):
+        if not self.data_queue:
+            return
+        try:
+            for _ in range(min(self.batch_size, len(self.data_queue))):
+                status_data, timestamp = self.data_queue.popleft()
+                channel_data = [
+                    status_data.get("forward_power", 0),
+                    status_data.get("reflect_power", 0),
+                    status_data.get("delivery_power", 0),
+                    status_data.get("frequency", 0),
+                    status_data.get("gamma", 0),
+                    status_data.get("real_gamma", 0),
+                    status_data.get("image_gamma", 0),
+                    status_data.get("rf_phase", 0),
+                    status_data.get("temperature", 0)
+                ]
+                self.plot_widget.update_channels(channel_data, timestamp)
+        except Exception as e:
+            print(f"Error in process_batch: {e}")
