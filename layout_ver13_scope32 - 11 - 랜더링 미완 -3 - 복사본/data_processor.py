@@ -14,10 +14,10 @@ from data_manager import StatusParser
 class DataProcessor:
     """데이터 처리 관리자"""
     PLOT_UPDATE_RATE = 1
-    
+
     def __init__(self, parent):
         self.parent = parent
-        self.data_queue = deque(maxlen=200)
+        self.data_queue = deque(maxlen=50)  # 성능 최적화: 200 → 50
         self.process_count_since_last_plot = 0 # 그래프 업데이트 빈도 조절용 카운터
         self.last_power_sync_time = 0  # 251103✅ 이 줄 추가
     
@@ -28,7 +28,7 @@ class DataProcessor:
     def process_data_queue(self):
         """데이터 큐 처리 - 상태 조회 로그 필터링 및 OpenGL 에러 방지"""
         processed_count = 0
-        while self.data_queue and processed_count < 30:  # 한 번에 최대 5개만 처리
+        while self.data_queue and processed_count < 10:  # 성능 최적화: 30 → 10
             data, timestamp = self.data_queue.popleft()
             if not data:
                 continue

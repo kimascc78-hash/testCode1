@@ -74,7 +74,7 @@
     }
   },
   "plot_settings": {
-    "display_time_seconds": 120,
+    "display_time_seconds": 60,
     "update_interval": 30,
     "line_width": 1,
     "antialiasing": true,
@@ -91,7 +91,7 @@
     "status_interval_ms": 100,
     "auto_adjust": true,
     "advanced_mode": false,
-    "osc_render_interval_ms": 30,
-    "main_graph_update_count": 5
+    "osc_render_interval_ms": 50,
+    "main_graph_update_count": 8
   }
 }
