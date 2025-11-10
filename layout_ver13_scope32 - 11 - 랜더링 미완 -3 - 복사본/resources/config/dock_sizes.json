@@ -1,0 +1,12 @@
+{
+  "temperature": {
+    "docked": {
+      "width": 321,
+      "height": 406
+    },
+    "floating": {
+      "width": 600,
+      "height": 800
+    }
+  }
+}

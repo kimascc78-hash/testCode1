@@ -1,0 +1,97 @@
+{
+  "colors": {
+    "graph_max": "#00f0ff",
+    "graph_min": "#ff0000",
+    "graph_delivery": "#ff9900",
+    "graph_avg": "#00ff00",
+    "graph_volt": "#ffff00",
+    "graph_real_gamma": "#33ccff",
+    "graph_image_gamma": "#cc33ff",
+    "graph_phase": "#ff3333",
+    "graph_temp": "#ff00ff"
+  },
+  "gauge_ranges": {
+    "forward_power": {
+      "min": 0.0,
+      "max": 3000.0,
+      "unit": "W"
+    },
+    "reflect_power": {
+      "min": 0.0,
+      "max": 300.0,
+      "unit": "W"
+    },
+    "delivery_power": {
+      "min": 0.0,
+      "max": 3000.0,
+      "unit": "W"
+    },
+    "frequency": {
+      "min": 0.0,
+      "max": 30.0,
+      "unit": "MHz"
+    },
+    "gamma": {
+      "min": 0.0,
+      "max": 1.0,
+      "unit": ""
+    },
+    "real_gamma": {
+      "min": 0.0,
+      "max": 1.0,
+      "unit": ""
+    },
+    "image_gamma": {
+      "min": 0.0,
+      "max": 1.0,
+      "unit": ""
+    },
+    "rf_phase": {
+      "min": 0.0,
+      "max": 360.0,
+      "unit": "°"
+    },
+    "temperature": {
+      "min": 20.0,
+      "max": 80.0,
+      "unit": "°C"
+    }
+  },
+  "thresholds": {
+    "forward_power": {
+      "caution": 400.0,
+      "warning": 700.0,
+      "error": 1000.0
+    },
+    "reflect_power": {
+      "warning": 20.0,
+      "error": 50.0
+    },
+    "temperature": {
+      "low": 20.0,
+      "warning": 50.0,
+      "error": 70.0
+    }
+  },
+  "plot_settings": {
+    "display_time_seconds": 120,
+    "update_interval": 30,
+    "line_width": 1,
+    "antialiasing": true,
+    "grid_alpha": 0.06,
+    "auto_range": true
+  },
+  "status_monitor": {
+    "alarm_blink_duration": 2000,
+    "temperature_precision": 1,
+    "power_precision": 2,
+    "frequency_precision": 2
+  },
+  "data_collection": {
+    "status_interval_ms": 100,
+    "auto_adjust": true,
+    "advanced_mode": false,
+    "osc_render_interval_ms": 30,
+    "main_graph_update_count": 5
+  }
+}
