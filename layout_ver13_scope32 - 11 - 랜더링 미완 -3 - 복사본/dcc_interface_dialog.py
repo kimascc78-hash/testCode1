@@ -5,66 +5,13 @@ DC 전원 제어 및 모니터링 전용 다이얼로그
 
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QGroupBox, QGridLayout, QCheckBox, QFrame
+    QGroupBox, QGridLayout, QCheckBox, QFrame, QComboBox
 )
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QFont
 from rf_protocol import RFProtocol
 from developer_widgets.system_widgets.system_data_manager import SystemDataManager
-
-
-class ColoredCheckBox(QCheckBox):
-    """색상이 적용된 체크박스"""
-
-    def __init__(self, text, parent=None):
-        super().__init__(text, parent)
-        self.setEnabled(False)  # Read-only
-        self.status_type = "disconnected"
-        self.update_style()
-
-    def set_status(self, is_checked, status_type):
-        """
-        상태 설정
-        status_type: "normal" (녹색), "error" (빨간색), "inactive" (회색), "disconnected" (어두운 회색)
-        """
-        self.setChecked(is_checked)
-        self.status_type = status_type
-        self.update_style()
-
-    def update_style(self):
-        """상태에 따른 스타일 적용"""
-        if self.status_type == "normal":
-            bg_color = "#4CAF50"  # 녹색
-            text_color = "#ffffff"
-        elif self.status_type == "error":
-            bg_color = "#F44336"  # 빨간색
-            text_color = "#ffffff"
-        elif self.status_type == "inactive":
-            bg_color = "#9E9E9E"  # 회색
-            text_color = "#ffffff"
-        else:  # disconnected
-            bg_color = "#555555"  # 어두운 회색
-            text_color = "#aaaaaa"
-
-        self.setStyleSheet(f"""
-            QCheckBox {{
-                background-color: {bg_color};
-                color: {text_color};
-                padding: 6px;
-                border-radius: 4px;
-                font-weight: bold;
-            }}
-            QCheckBox::indicator {{
-                width: 18px;
-                height: 18px;
-                border: 2px solid {text_color};
-                border-radius: 3px;
-                background-color: rgba(255, 255, 255, 0.2);
-            }}
-            QCheckBox::indicator:checked {{
-                background-color: {text_color};
-            }}
-        """)
+from status_monitor_dialog import StatusIndicator
 
 
 class DCCInterfaceDialog(QDialog):
@@ -75,8 +22,12 @@ class DCCInterfaceDialog(QDialog):
         self.parent_window = parent
         self.sys_data_manager = SystemDataManager()
 
-        # 상태 체크박스 저장
-        self.status_checkboxes = {}
+        # 상태 인디케이터 저장 (StatusIndicator 사용)
+        self.status_indicators = {}
+
+        # 자동 갱신 설정
+        self.auto_refresh_enabled = True  # 기본값: 활성화
+        self.refresh_interval = 1000  # 기본값: 1000ms (1초)
 
         # 비트별 상태 타입 정의 (0일 때의 상태)
         # "normal_on_zero": True이면 0일 때 정상, False이면 1일 때 정상
@@ -234,17 +185,52 @@ class DCCInterfaceDialog(QDialog):
         group = QGroupBox("Status Monitor")
         layout = QVBoxLayout(group)
 
-        # 리프레쉬 컨트롤
-        refresh_layout = QHBoxLayout()
-        refresh_layout.addStretch()
+        # 자동 갱신 컨트롤 (옵션 1: 콤팩트 인라인 배치)
+        refresh_control_layout = QHBoxLayout()
+        refresh_control_layout.addStretch()
 
-        self.auto_refresh_checkbox = QCheckBox("Auto Refresh (1s)")
-        self.auto_refresh_checkbox.setStyleSheet("color: #d8dee9;")
+        self.auto_refresh_checkbox = QCheckBox("Auto Refresh")
+        self.auto_refresh_checkbox.setChecked(self.auto_refresh_enabled)
+        self.auto_refresh_checkbox.setStyleSheet("color: #d8dee9; font-size: 12px;")
         self.auto_refresh_checkbox.stateChanged.connect(self.toggle_auto_refresh)
-        refresh_layout.addWidget(self.auto_refresh_checkbox)
+        refresh_control_layout.addWidget(self.auto_refresh_checkbox)
 
-        refresh_button = QPushButton("Refresh Now")
-        refresh_button.setStyleSheet("""
+        self.refresh_interval_combo = QComboBox()
+        self.refresh_interval_combo.addItems([
+            "100ms", "200ms", "500ms", "1000ms", "2000ms", "3000ms", "5000ms"
+        ])
+        self.refresh_interval_combo.setCurrentText("1000ms")
+        self.refresh_interval_combo.setStyleSheet("""
+            QComboBox {
+                background-color: #3b4252;
+                color: #d8dee9;
+                border: 1px solid #4c566a;
+                border-radius: 4px;
+                padding: 4px 8px;
+                min-width: 80px;
+            }
+            QComboBox::drop-down {
+                border: none;
+            }
+            QComboBox::down-arrow {
+                image: none;
+                border-left: 4px solid transparent;
+                border-right: 4px solid transparent;
+                border-top: 5px solid #d8dee9;
+                margin-right: 5px;
+            }
+            QComboBox QAbstractItemView {
+                background-color: #3b4252;
+                color: #d8dee9;
+                selection-background-color: #5e81ac;
+            }
+        """)
+        self.refresh_interval_combo.currentTextChanged.connect(self.change_refresh_interval)
+        refresh_control_layout.addWidget(self.refresh_interval_combo)
+
+        manual_refresh_btn = QPushButton("Refresh Now")
+        manual_refresh_btn.clicked.connect(self.load_status)
+        manual_refresh_btn.setStyleSheet("""
             QPushButton {
                 background-color: #5e81ac;
                 border: none;
@@ -252,15 +238,15 @@ class DCCInterfaceDialog(QDialog):
                 padding: 6px 12px;
                 color: white;
                 font-weight: bold;
+                font-size: 11px;
             }
             QPushButton:hover {
                 background-color: #81a1c1;
             }
         """)
-        refresh_button.clicked.connect(self.load_status)
-        refresh_layout.addWidget(refresh_button)
+        refresh_control_layout.addWidget(manual_refresh_btn)
 
-        layout.addLayout(refresh_layout)
+        layout.addLayout(refresh_control_layout)
 
         # 구분선
         layout.addWidget(self.create_h_line())
@@ -323,9 +309,9 @@ class DCCInterfaceDialog(QDialog):
         ]
 
         for key, label in bits:
-            cb = ColoredCheckBox(label)
-            self.status_checkboxes[key] = cb
-            layout.addWidget(cb)
+            indicator = StatusIndicator(label, "disconnected")
+            self.status_indicators[key] = indicator
+            layout.addWidget(indicator)
 
         return group
 
@@ -340,9 +326,9 @@ class DCCInterfaceDialog(QDialog):
         ]
 
         for key, label in bits:
-            cb = ColoredCheckBox(label)
-            self.status_checkboxes[key] = cb
-            layout.addWidget(cb)
+            indicator = StatusIndicator(label, "disconnected")
+            self.status_indicators[key] = indicator
+            layout.addWidget(indicator)
 
         return group
 
@@ -357,9 +343,9 @@ class DCCInterfaceDialog(QDialog):
         ]
 
         for key, label in bits:
-            cb = ColoredCheckBox(label)
-            self.status_checkboxes[key] = cb
-            layout.addWidget(cb)
+            indicator = StatusIndicator(label, "disconnected")
+            self.status_indicators[key] = indicator
+            layout.addWidget(indicator)
 
         return group
 
@@ -381,9 +367,9 @@ class DCCInterfaceDialog(QDialog):
         ]
 
         for key, label in bits:
-            cb = ColoredCheckBox(label)
-            self.status_checkboxes[key] = cb
-            layout.addWidget(cb)
+            indicator = StatusIndicator(label, "disconnected")
+            self.status_indicators[key] = indicator
+            layout.addWidget(indicator)
 
         return group
 
@@ -401,9 +387,9 @@ class DCCInterfaceDialog(QDialog):
         ]
 
         for key, label in bits:
-            cb = ColoredCheckBox(label)
-            self.status_checkboxes[key] = cb
-            layout.addWidget(cb)
+            indicator = StatusIndicator(label, "disconnected")
+            self.status_indicators[key] = indicator
+            layout.addWidget(indicator)
 
         return group
 
@@ -429,9 +415,9 @@ class DCCInterfaceDialog(QDialog):
         ]
 
         for key, label in bits:
-            cb = ColoredCheckBox(label)
-            self.status_checkboxes[key] = cb
-            layout.addWidget(cb)
+            indicator = StatusIndicator(label, "disconnected")
+            self.status_indicators[key] = indicator
+            layout.addWidget(indicator)
 
         return group
 
@@ -494,12 +480,40 @@ class DCCInterfaceDialog(QDialog):
         return line
 
     def toggle_auto_refresh(self, state):
-        """자동 갱신 토글"""
-        if state == Qt.Checked:
-            self.auto_refresh_timer.start(1000)  # 1초마다
+        """자동 갱신 on/off 토글"""
+        self.auto_refresh_enabled = (state == Qt.Checked)
+        if self.auto_refresh_enabled:
+            self.auto_refresh_timer.start(self.refresh_interval)
             self.load_status()  # 즉시 한 번 로드
+            if hasattr(self.parent_window, 'log_manager'):
+                self.parent_window.log_manager.write_log(
+                    f"[INFO] DCC 자동 갱신 활성화: {self.refresh_interval}ms",
+                    "cyan"
+                )
         else:
             self.auto_refresh_timer.stop()
+            if hasattr(self.parent_window, 'log_manager'):
+                self.parent_window.log_manager.write_log(
+                    "[INFO] DCC 자동 갱신 비활성화",
+                    "yellow"
+                )
+
+    def change_refresh_interval(self, text):
+        """갱신 간격 변경"""
+        # "1000ms" -> 1000 변환
+        interval = int(text.replace("ms", ""))
+        self.refresh_interval = interval
+
+        # 타이머가 실행 중이면 재시작
+        if self.auto_refresh_enabled and self.auto_refresh_timer.isActive():
+            self.auto_refresh_timer.stop()
+            self.auto_refresh_timer.start(self.refresh_interval)
+
+            if hasattr(self.parent_window, 'log_manager'):
+                self.parent_window.log_manager.write_log(
+                    f"[INFO] DCC 갱신 간격 변경: {self.refresh_interval}ms",
+                    "cyan"
+                )
 
     def load_status(self):
         """DCC 상태 조회"""
@@ -512,8 +526,8 @@ class DCCInterfaceDialog(QDialog):
 
         if not self.parent_window.network_manager.client_thread:
             # 연결 없음 상태로 표시
-            for key, checkbox in self.status_checkboxes.items():
-                checkbox.set_status(False, "disconnected")
+            for key, indicator in self.status_indicators.items():
+                indicator.set_status("disconnected", f"{key.replace('_', ' ').title()}: N/A")
             return
 
         # CMD_SYSTEM_CONTROL + SUBCMD_GET_DCC_IF
@@ -538,15 +552,21 @@ class DCCInterfaceDialog(QDialog):
                     self.rf_amp_temp_label.setText(f"{dcc_if['rf_amp_temp']:.1f} °C")
                     self.water_temp_label.setText(f"{dcc_if['water_temp']:.1f} °C")
 
-                    # 상태 비트 업데이트 (색상 코딩 적용)
-                    for key, checkbox in self.status_checkboxes.items():
+                    # 상태 비트 업데이트 (StatusIndicator 사용)
+                    for key, indicator in self.status_indicators.items():
                         bit_value = dcc_if['status_bits'].get(key, False)
                         status_type = self.determine_status_type(key, bit_value)
-                        checkbox.set_status(bit_value, status_type)
+                        # 라벨 텍스트 생성
+                        label_text = key.replace('_', ' ').title()
+                        if bit_value:
+                            label_text += ": ON" if not self.bit_status_config[key]['normal_on_zero'] else ": FAIL"
+                        else:
+                            label_text += ": OFF" if not self.bit_status_config[key]['normal_on_zero'] else ": OK"
+                        indicator.set_status(status_type, label_text)
         else:
             # 에러 발생 - 연결 없음으로 표시
-            for key, checkbox in self.status_checkboxes.items():
-                checkbox.set_status(False, "disconnected")
+            for key, indicator in self.status_indicators.items():
+                indicator.set_status("disconnected", f"{key.replace('_', ' ').title()}: N/A")
 
     def determine_status_type(self, bit_key, bit_value):
         """
