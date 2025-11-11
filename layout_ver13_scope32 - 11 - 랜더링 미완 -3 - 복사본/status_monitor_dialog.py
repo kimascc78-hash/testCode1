@@ -582,8 +582,26 @@ class StatusMonitorDialog(QDialog):
             }}
         """)
         button_layout.addWidget(alarm_clear_btn)
+
+        # DCC Interface 버튼 추가
+        dcc_interface_btn = QPushButton("DCC Interface")
+        dcc_interface_btn.clicked.connect(self.show_dcc_interface)
+        dcc_interface_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: #8fbcbb;
+                border: none;
+                border-radius: 5px;
+                padding: 8px 16px;
+                color: white;
+                font-weight: bold;
+            }}
+            QPushButton:hover {{
+                background-color: #88c0d0;
+            }}
+        """)
+        button_layout.addWidget(dcc_interface_btn)
         #####
-        
+
         button_layout.addWidget(refresh_btn)
         button_layout.addWidget(close_btn)
         main_layout.addLayout(button_layout)
@@ -1117,6 +1135,25 @@ class StatusMonitorDialog(QDialog):
                 
         except Exception as e:
             error_msg = f"알람 클리어 중 오류 발생: {str(e)}"
+            if hasattr(self.parent_window, 'log_manager'):
+                self.parent_window.log_manager.write_log(
+                    f"[ERROR] {error_msg}",
+                    "red"
+                )
+
+    def show_dcc_interface(self):
+        """DCC Interface 다이얼로그 표시"""
+        try:
+            from dcc_interface_dialog import DCCInterfaceDialog
+
+            dcc_dialog = DCCInterfaceDialog(self.parent_window)
+            dcc_dialog.exec_()  # 모달 다이얼로그로 표시
+
+            if hasattr(self.parent_window, 'log_manager'):
+                self.parent_window.log_manager.write_log("[INFO] DCC Interface 다이얼로그 열림", "cyan")
+
+        except Exception as e:
+            error_msg = f"DCC Interface 다이얼로그 열기 실패: {str(e)}"
             if hasattr(self.parent_window, 'log_manager'):
                 self.parent_window.log_manager.write_log(
                     f"[ERROR] {error_msg}",
