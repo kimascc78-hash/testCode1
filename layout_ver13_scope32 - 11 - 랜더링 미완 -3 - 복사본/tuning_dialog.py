@@ -6,7 +6,7 @@ RF 장비 튜닝 설정을 위한 다이얼로그 - 탭별 적용 기능 수정
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QTabWidget, QWidget, QFormLayout,
     QPushButton, QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox, QGroupBox,
-    QScrollArea, QLabel, QMessageBox
+    QScrollArea, QLabel, QMessageBox, QApplication
 )
 from PyQt5.QtCore import Qt, pyqtSignal
 import ipaddress
@@ -83,14 +83,26 @@ class ImprovedTuningDialog(QDialog):
         
         # 버튼 레이아웃
         button_layout = QHBoxLayout()
-        
+
+        # 현재 값을 기본값으로 저장 버튼
+        save_default_btn = QPushButton("현재 값을 기본값으로 저장")
+        save_default_btn.setStyleSheet("background-color: #2e7d32; font-weight: bold;")
+        save_default_btn.clicked.connect(self.save_as_default)
+        button_layout.addWidget(save_default_btn)
+
         # 기본값 복원 버튼
         reset_btn = QPushButton("기본값 복원")
         reset_btn.clicked.connect(self.reset_to_defaults)
         button_layout.addWidget(reset_btn)
-        
+
+        # 시스템 기본값으로 복원 버튼
+        system_reset_btn = QPushButton("시스템 기본값 복원")
+        system_reset_btn.setStyleSheet("background-color: #c62828; font-weight: bold;")
+        system_reset_btn.clicked.connect(self.reset_to_system_defaults)
+        button_layout.addWidget(system_reset_btn)
+
         button_layout.addStretch()
-        
+
         # 취소/전체 적용 버튼
         cancel_btn = QPushButton("취소")
         cancel_btn.clicked.connect(self.reject)
@@ -236,26 +248,34 @@ class ImprovedTuningDialog(QDialog):
         self.setStyleSheet(style_sheet)
     
     def create_tab_apply_button(self, tab_name):
-        """탭별 적용 버튼 생성"""
-        apply_btn = QPushButton(f"{tab_name} 적용")
-        apply_btn.setProperty("class", "tab-apply")
+        """탭별 적용 버튼 생성 - 개발자 다이얼로그 스타일"""
+        apply_btn = QPushButton("Apply")
         apply_btn.setStyleSheet("""
             QPushButton {
-                background-color: #ff6b00;
-                border: 1px solid #ff8c00;
-                color: #ffffff;
+                background-color: #FF9800;
+                color: white;
                 font-weight: bold;
-                padding: 8px 16px;
-                border-radius: 4px;
+                padding: 6px 12px;
             }
             QPushButton:hover {
-                background-color: #ff8c00;
-                color: #1e1e2e;
+                background-color: #FFB74D;
             }
         """)
         # 한글 탭 이름을 그대로 전달 (apply_tab_settings에서 변환)
         apply_btn.clicked.connect(lambda: self.apply_tab_settings(tab_name))
         return apply_btn
+
+    def create_tab_load_button(self, tab_name):
+        """탭별 로드 버튼 생성 - 개발자 다이얼로그 스타일"""
+        load_btn = QPushButton("Load")
+        load_btn.setStyleSheet("""
+            QPushButton {
+                padding: 6px 12px;
+            }
+        """)
+        # 한글 탭 이름을 그대로 전달 (load_tab_settings에서 변환)
+        load_btn.clicked.connect(lambda: self.load_tab_settings(tab_name))
+        return load_btn
     
     def create_control_tab(self, tab_widget):
         """제어 설정 탭"""
@@ -290,13 +310,17 @@ class ImprovedTuningDialog(QDialog):
         control_layout.addRow(regulation_label, regulation_mode)
         
         layout.addWidget(control_group)
-        
-        # 탭별 적용 버튼
+
+        # 로드 및 적용 버튼
+        button_layout = QHBoxLayout()
+        load_btn = self.create_tab_load_button("제어")
         apply_btn = self.create_tab_apply_button("제어")
-        layout.addWidget(apply_btn)
-        
+        button_layout.addWidget(load_btn)
+        button_layout.addWidget(apply_btn)
+        layout.addLayout(button_layout)
+
         layout.addStretch()
-        
+
         scroll.setWidget(scroll_widget)
         tab_layout = QVBoxLayout(tab)
         tab_layout.addWidget(scroll)
@@ -347,10 +371,14 @@ class ImprovedTuningDialog(QDialog):
         ramp_layout.addRow(ramp_down_label, ramp_down_time)
         
         layout.addWidget(ramp_group)
-        
-        # 탭별 적용 버튼
+
+        # 로드 및 적용 버튼
+        button_layout = QHBoxLayout()
+        load_btn = self.create_tab_load_button("램프")
         apply_btn = self.create_tab_apply_button("램프")
-        layout.addWidget(apply_btn)
+        button_layout.addWidget(load_btn)
+        button_layout.addWidget(apply_btn)
+        layout.addLayout(button_layout)
         
         layout.addStretch()
         
@@ -414,10 +442,14 @@ class ImprovedTuningDialog(QDialog):
         cex_layout.addRow(rf_output_label, rf_output_phase)
         
         layout.addWidget(cex_group)
-        
-        # 탭별 적용 버튼
+
+        # 로드 및 적용 버튼
+        button_layout = QHBoxLayout()
+        load_btn = self.create_tab_load_button("CEX")
         apply_btn = self.create_tab_apply_button("CEX")
-        layout.addWidget(apply_btn)
+        button_layout.addWidget(load_btn)
+        button_layout.addWidget(apply_btn)
+        layout.addLayout(button_layout)
         
         layout.addStretch()
         
@@ -548,10 +580,14 @@ class ImprovedTuningDialog(QDialog):
         pulse_layout.addRow(pulse_freq_label, pulse_freq)
         
         layout.addWidget(pulse_group)
-        
-        # 탭별 적용 버튼
+
+        # 로드 및 적용 버튼
+        button_layout = QHBoxLayout()
+        load_btn = self.create_tab_load_button("펄스")
         apply_btn = self.create_tab_apply_button("펄스")
-        layout.addWidget(apply_btn)
+        button_layout.addWidget(load_btn)
+        button_layout.addWidget(apply_btn)
+        layout.addLayout(button_layout)
         
         layout.addStretch()
         
@@ -703,10 +739,14 @@ class ImprovedTuningDialog(QDialog):
         step_layout.addRow(return_gamma_label, return_gamma)
         
         layout.addWidget(step_group)
-        
-        # 탭별 적용 버튼
+
+        # 로드 및 적용 버튼
+        button_layout = QHBoxLayout()
+        load_btn = self.create_tab_load_button("주파수")
         apply_btn = self.create_tab_apply_button("주파수")
-        layout.addWidget(apply_btn)
+        button_layout.addWidget(load_btn)
+        button_layout.addWidget(apply_btn)
+        layout.addLayout(button_layout)
         
         layout.addStretch()
         
@@ -905,13 +945,9 @@ class ImprovedTuningDialog(QDialog):
     
     def apply_tab_settings(self, tab_name):
         """탭별 설정 적용 - 수정된 버전"""
-        # 디버깅을 위한 로그 출력
-        if hasattr(self.parent_window, 'write_log'):
-            self.parent_window.write_log(f"[DEBUG] 탭별 적용 시도: {tab_name}", "yellow")
-        
         # 현재 입력값들을 임시로 업데이트
         temp_settings = self.tuning_settings.copy()
-        
+
         # 현재 입력값들을 temp_settings에 반영
         for key, widget in self.inputs.items():
             if isinstance(widget, QComboBox):
@@ -920,44 +956,103 @@ class ImprovedTuningDialog(QDialog):
                 temp_settings[key] = str(widget.value())
             elif isinstance(widget, QLineEdit):
                 temp_settings[key] = widget.text()
-        
+
         # 유효성 검사 (네트워크 탭인 경우)
         if tab_name == "네트워크":
             if not self.validate_ip_address(temp_settings["IP Address"]):
                 QMessageBox.warning(self, "오류", "유효하지 않은 IP 주소입니다.")
                 return
-        
+
         # 영문 탭 이름으로 변환
         english_tab_name = self.tab_name_mapping.get(tab_name, tab_name.lower())
-        
-        if hasattr(self.parent_window, 'write_log'):
-            self.parent_window.write_log(f"[DEBUG] 탭 이름 변환: {tab_name} -> {english_tab_name}", "yellow")
-        
+
         # 탭별 설정값 추출
         tab_settings = self.get_tab_settings(english_tab_name)
-        
+
         if not tab_settings:
             error_msg = f"{tab_name} 탭의 설정을 찾을 수 없습니다. (영문명: {english_tab_name})"
             QMessageBox.warning(self, "오류", error_msg)
             if hasattr(self.parent_window, 'write_log'):
                 self.parent_window.write_log(f"[ERROR] {error_msg}", "red")
-                self.parent_window.write_log(f"[DEBUG] 사용 가능한 탭 키: {list(self.tab_keys.keys())}", "yellow")
             return
-        
-        if hasattr(self.parent_window, 'write_log'):
-            self.parent_window.write_log(f"[DEBUG] 추출된 설정: {tab_settings}", "yellow")
-        
+
         # 시그널 발생 - 영문 탭 이름으로 전송
         self.tab_applied.emit(english_tab_name, tab_settings)
         
         # 성공 메시지는 부모 윈도우에서 처리 후 표시하도록 변경
         # QMessageBox.information(self, "적용 완료", f"{tab_name} 설정이 장비에 적용되었습니다.")
     
+    def save_as_default(self):
+        """현재 설정을 사용자 기본값으로 저장"""
+        # 현재 UI의 모든 값을 읽어옴
+        current_settings = {}
+        for key, widget in self.inputs.items():
+            if isinstance(widget, QComboBox):
+                current_settings[key] = widget.currentText()
+            elif isinstance(widget, (QSpinBox, QDoubleSpinBox)):
+                current_settings[key] = str(widget.value())
+            elif isinstance(widget, QLineEdit):
+                current_settings[key] = widget.text()
+
+        # TuningSettingsManager를 통해 저장
+        if hasattr(self.parent_window, 'tuning_manager'):
+            success, msg = self.parent_window.tuning_manager.save_user_defaults(current_settings)
+            if success:
+                QMessageBox.information(self, "저장 완료", "현재 설정이 사용자 기본값으로 저장되었습니다.\n다음부터 '기본값 복원'시 이 값이 사용됩니다.")
+            else:
+                QMessageBox.warning(self, "저장 실패", msg)
+        else:
+            QMessageBox.warning(self, "오류", "TuningManager를 찾을 수 없습니다.")
+
     def reset_to_defaults(self):
-        """기본값으로 복원"""
-        defaults = {
+        """기본값으로 복원 (사용자 기본값 우선, 없으면 시스템 기본값)"""
+        defaults = None
+
+        # 1단계: 사용자 기본값 로드 시도
+        if hasattr(self.parent_window, 'tuning_manager'):
+            success, user_defaults, msg = self.parent_window.tuning_manager.load_user_defaults()
+            if success:
+                defaults = user_defaults
+                restore_type = "사용자 기본값"
+            else:
+                # 사용자 기본값 없음 -> 시스템 기본값 사용
+                restore_type = "시스템 기본값"
+
+        # 2단계: 기본값이 없으면 시스템 기본값 사용
+        if defaults is None:
+            defaults = self.get_system_defaults()
+            restore_type = "시스템 기본값"
+
+        # 3단계: UI에 기본값 적용
+        self.apply_defaults_to_ui(defaults)
+
+        QMessageBox.information(self, "복원 완료", f"모든 설정이 {restore_type}으로 복원되었습니다.")
+
+    def reset_to_system_defaults(self):
+        """시스템 기본값으로 강제 복원"""
+        reply = QMessageBox.question(
+            self, "확인",
+            "사용자 기본값을 삭제하고 시스템 기본값으로 복원하시겠습니까?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+
+        if reply == QMessageBox.Yes:
+            # 사용자 기본값 삭제
+            if hasattr(self.parent_window, 'tuning_manager'):
+                self.parent_window.tuning_manager.delete_user_defaults()
+
+            # 시스템 기본값으로 복원
+            defaults = self.get_system_defaults()
+            self.apply_defaults_to_ui(defaults)
+
+            QMessageBox.information(self, "복원 완료", "모든 설정이 시스템 기본값으로 복원되었습니다.")
+
+    def get_system_defaults(self):
+        """시스템 기본값 반환"""
+        return {
             "Control Mode": "User Port",
-            "Regulation Mode": "Forward Power", 
+            "Regulation Mode": "Forward Power",
             "Ramp Mode": "Disable",
             "Ramp Up Time": "0",
             "Ramp Down Time": "0",
@@ -965,9 +1060,12 @@ class ImprovedTuningDialog(QDialog):
             "CEX Mode": "Master",
             "CEX Output Phase": "0",
             "RF Output Phase": "0",
-            
-            # ===== Pulse 기본값 - 수정됨 =====
-            "Pulse On/Off": "Disable",
+
+            # ===== Pulse 기본값 =====
+            "Pulsing Type": "Amplitude",
+            "Pulsing Mode": "Master",
+            "Pulse On/Off": "Off",
+            "Sync Output": "Off",
             "Pulse Frequency": "10000",
             "Pulse0 Level": "100.0",
             "Pulse1 Level": "75.0",
@@ -979,11 +1077,11 @@ class ImprovedTuningDialog(QDialog):
             "Pulse3 Duty": "20.0",
             "Input Sync Delay": "0",
             "Output Sync Delay": "0",
-            "Pulse Mode": "Master",
-            
+            "Width Control": "0",
+
             "Freq Tuning": "Disable",
-            "Retuning Mode": "One-Time",
-            "Setting Mode": "Fixed",
+            "Retuning Mode": "Disable",
+            "Setting Mode": "Disable",
             "Min Frequency": "0",
             "Max Frequency": "0",
             "Start Frequency": "0",
@@ -992,23 +1090,45 @@ class ImprovedTuningDialog(QDialog):
             "Stop Gamma": "0",
             "Return Gamma": "0",
             "Set RF Frequency": "0",
+
+            # Bank
+            "Bank1 Enable": "Disable",
+            "Bank1 Equation Enable": "Disable",
+            "Bank1 X0": "1.0",
+            "Bank1 A": "0.0",
+            "Bank1 B": "0.0",
+            "Bank1 C": "1.0",
+            "Bank1 D": "0.0",
+            "Bank2 Enable": "Disable",
+            "Bank2 Equation Enable": "Disable",
+            "Bank2 X0": "1.0",
+            "Bank2 A": "0.0",
+            "Bank2 B": "0.0",
+            "Bank2 C": "1.0",
+            "Bank2 D": "0.0",
+
             "IP Address": "127.0.0.1",
             "Subnet Mask": "255.255.255.0",
             "Gateway": "192.168.0.1",
             "DNS": "0.0.0.0"
         }
-        
+
+    def apply_defaults_to_ui(self, defaults):
+        """기본값을 UI에 적용"""
         for key, default_value in defaults.items():
             if key in self.inputs:
                 widget = self.inputs[key]
-                if isinstance(widget, QComboBox):
-                    widget.setCurrentText(default_value)
-                elif isinstance(widget, (QSpinBox, QDoubleSpinBox)):
-                    widget.setValue(float(default_value))
-                elif isinstance(widget, QLineEdit):
-                    widget.setText(default_value)
-        
-        QMessageBox.information(self, "복원 완료", "모든 설정이 기본값으로 복원되었습니다.")
+                try:
+                    if isinstance(widget, QComboBox):
+                        widget.setCurrentText(str(default_value))
+                    elif isinstance(widget, QDoubleSpinBox):
+                        widget.setValue(float(default_value))
+                    elif isinstance(widget, QSpinBox):
+                        widget.setValue(int(float(default_value)))
+                    elif isinstance(widget, QLineEdit):
+                        widget.setText(str(default_value))
+                except Exception as e:
+                    print(f"[WARNING] Failed to set {key} = {default_value}: {e}")
     
     def validate_settings(self):
         """설정값 유효성 검사"""
@@ -1162,10 +1282,14 @@ class ImprovedTuningDialog(QDialog):
         bank2_layout.addRow(QLabel("D (상수):"), bank2_d)
         
         layout.addWidget(bank2_group)
-        
-        # 탭별 적용 버튼
+
+        # 로드 및 적용 버튼
+        button_layout = QHBoxLayout()
+        load_btn = self.create_tab_load_button("Bank")
         apply_btn = self.create_tab_apply_button("Bank")
-        layout.addWidget(apply_btn)
+        button_layout.addWidget(load_btn)
+        button_layout.addWidget(apply_btn)
+        layout.addLayout(button_layout)
         
         layout.addStretch()
         
@@ -1173,3 +1297,126 @@ class ImprovedTuningDialog(QDialog):
         tab_layout = QVBoxLayout(tab)
         tab_layout.addWidget(scroll)
         tab_widget.addTab(tab, "Bank")
+
+    def load_tab_settings(self, tab_name_korean):
+        """장비에서 현재 탭의 설정값 읽어오기"""
+        # 한글 탭 이름을 영문 키로 변환
+        tab_name = self.tab_name_mapping.get(tab_name_korean, tab_name_korean.lower())
+
+        # parent_window 확인
+        if not hasattr(self, 'parent_window') or not self.parent_window:
+            QMessageBox.warning(self, "오류", "Parent window를 찾을 수 없습니다.")
+            return
+
+        # tuning_manager 확인
+        if not hasattr(self.parent_window, 'tuning_manager'):
+            QMessageBox.warning(self, "오류", "TuningManager를 찾을 수 없습니다.")
+            return
+
+        # network_manager 확인
+        if not hasattr(self.parent_window, 'network_manager'):
+            QMessageBox.warning(self, "오류", "NetworkManager를 찾을 수 없습니다.")
+            return
+
+        try:
+            # GET 명령어 목록 가져오기
+            success, commands, msg = self.parent_window.tuning_manager.get_tab_read_commands(tab_name)
+
+            if not success or not commands:
+                QMessageBox.warning(self, "오류", f"{tab_name_korean} 탭 읽기 명령어 생성 실패:\n{msg}")
+                return
+
+            # 진행 상황 다이얼로그 표시 (모달로 생성하지 않고 정보만 표시)
+            QApplication.processEvents()  # UI 업데이트
+
+            # 응답 수집
+            responses = []
+            failed_commands = []
+
+            # 각 명령어 순차 전송 (동기 모드)
+            for i, cmd_info in enumerate(commands):
+                try:
+                    # NetworkManager의 client_thread를 통해 명령어 전송
+                    if not self.parent_window.network_manager.client_thread:
+                        raise Exception("Client thread not initialized")
+
+                    result = self.parent_window.network_manager.client_thread.send_command(
+                        cmd_info['cmd'],
+                        cmd_info['subcmd'],
+                        cmd_info['data'],
+                        wait_response=True,
+                        timeout=3.0,
+                        sync=True
+                    )
+
+                    if result.success and result.response_data:
+                        # 응답 파싱
+                        from rf_protocol import RFProtocol
+                        parsed = RFProtocol.parse_response(result.response_data)
+
+                        if parsed and 'data' in parsed:
+                            responses.append({
+                                'subcmd': parsed['subcmd'],
+                                'data': parsed['data']
+                            })
+                        else:
+                            failed_commands.append(f"{cmd_info['description']} (파싱 실패)")
+                    else:
+                        error_msg = f"{cmd_info['description']}"
+                        if not result.success:
+                            error_msg += f" (실패: {result.message})"
+                        else:
+                            error_msg += " (응답 없음)"
+                        failed_commands.append(error_msg)
+
+                    QApplication.processEvents()  # UI 응답성 유지
+
+                except Exception as e:
+                    error_msg = f"{cmd_info['description']}: {str(e)}"
+                    failed_commands.append(error_msg)
+                    import traceback
+                    traceback.print_exc()
+                    continue
+
+            # 응답이 없는 경우
+            if not responses:
+                error_detail = "\n".join(failed_commands[:10]) if failed_commands else "알 수 없는 오류"
+                QMessageBox.warning(
+                    self, "오류",
+                    f"장비로부터 응답을 받지 못했습니다.\n\n"
+                    f"실패: {len(failed_commands)}/{len(commands)}\n\n"
+                    f"실패 상세:\n{error_detail}"
+                )
+                return
+
+            # 응답 파싱 및 설정 딕셔너리 생성
+            success, settings, msg = self.parent_window.tuning_manager.parse_tab_responses(tab_name, responses)
+
+            if not success or not settings:
+                QMessageBox.warning(self, "오류", f"응답 파싱 실패:\n{msg}")
+                return
+
+            # UI에 적용
+            self.apply_defaults_to_ui(settings)
+
+            # 결과 메시지
+            success_count = len(responses)
+            total_count = len(commands)
+            if failed_commands:
+                QMessageBox.information(
+                    self, "로드 완료",
+                    f"장비에서 {tab_name_korean} 설정을 불러왔습니다.\n\n"
+                    f"성공: {success_count}/{total_count}\n"
+                    f"실패: {len(failed_commands)}\n\n"
+                    f"실패한 항목:\n" + "\n".join(failed_commands[:5])  # 최대 5개만 표시
+                )
+            else:
+                QMessageBox.information(
+                    self, "로드 완료",
+                    f"장비에서 {tab_name_korean} 설정을 성공적으로 불러왔습니다.\n({success_count}/{total_count} 항목)"
+                )
+
+        except Exception as e:
+            QMessageBox.critical(self, "오류", f"설정 로드 중 예외 발생:\n{str(e)}")
+            import traceback
+            traceback.print_exc()

@@ -19,11 +19,11 @@ from .adc_dac_data_source import AdcDacDataSource, StatusDataSource
 from ui_widgets import SmartSpinBox, SmartDoubleSpinBox 
 from settings_dialog import SettingsDialog, SettingsManager # 새로 추가
 
-# pyqtgraph 성능 최적화 설정
-#pg.setConfigOptions(antialias=True, useOpenGL=False, enableExperimental=True, foreground='w', background='k')
-#pg.setConfigOptions(antialias=True, useOpenGL=True, enableExperimental=False, foreground='w', background='k')
-pg.setConfigOptions(antialias=True, useOpenGL=True, enableExperimental=True, foreground='w', background='k')
-#pg.setConfigOptions(enableExperimental=False, foreground='w', background='k')
+# pyqtgraph 성능 최적화 설정 (안정성 우선)
+# antialias=False: 렌더링 속도 향상
+# useOpenGL=True: GPU 가속 활성화
+# enableExperimental=False: 안정성 우선
+pg.setConfigOptions(antialias=False, useOpenGL=True, enableExperimental=False, foreground='w', background='k')
 
 # ============================================
 # 커스텀 ViewBox - 오른쪽 버튼 박스 확대

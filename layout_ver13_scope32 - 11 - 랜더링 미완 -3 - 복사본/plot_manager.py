@@ -16,13 +16,13 @@ class PlotManager(QObject):  # QObject 상속 추가 격자 테스트
         super(PlotManager, self).__init__(parent)  # QObject 초기화 (parent 전달) 격자 테스트
         self.parent = parent
         self.update_counter = 0
-        # 설정에서 가져오기 (없으면 기본값 4)
-        self.update_interval = 4  # 기본값
+        # 설정에서 가져오기 (없으면 기본값 8 - 성능 최적화)
+        self.update_interval = 8  # 기본값 (4→8로 증가)
         try:
             if hasattr(parent, 'settings_manager'):
                 settings = parent.settings_manager.settings
                 if "data_collection" in settings:
-                    self.update_interval = settings["data_collection"].get("main_graph_update_count", 4)
+                    self.update_interval = settings["data_collection"].get("main_graph_update_count", 8)
         except:
             pass  # 설정 로드 실패 시 기본값 사용
         self.time_axis_initialized = False  # 시간 축 포맷 초기화 플래그
@@ -108,19 +108,29 @@ class PlotManager(QObject):  # QObject 상속 추가 격자 테스트
                 # ========================================
                 time_data_np = np.array(time_deque, dtype=float)
                 value_data_np = np.array(value_deque, dtype=float)
-                
+
                 if len(time_data_np) < 2 or len(value_data_np) < 2:
                     continue
-                
+
+                # ========================================
+                # ✅ Down-sampling (성능 최적화)
+                # ========================================
+                MAX_VISIBLE_POINTS = 2000
+                if len(time_data_np) > MAX_VISIBLE_POINTS:
+                    # 균등 간격으로 샘플링하여 렌더링 포인트 감소
+                    indices = np.linspace(0, len(time_data_np)-1, MAX_VISIBLE_POINTS, dtype=int)
+                    time_data_np = time_data_np[indices]
+                    value_data_np = value_data_np[indices]
+
                 # ========================================
                 # ✅ 스크롤 차트: 왼쪽(과거) → 오른쪽(현재)
                 # ========================================
                 # 실제 시간 그대로 사용 (정규화 없음)
                 # 예: [50.0, 50.05, ..., 100.0] → 그대로 사용
-                
+
                 if i < len(self.parent.dock_manager.plot_lines):
                     plot_item = self.parent.dock_manager.plot_widgets[i].getPlotItem()
-                    
+
                     # ========================================
                     # ✅ 데이터 렌더링 (실제 시간 사용)
                     # ========================================
