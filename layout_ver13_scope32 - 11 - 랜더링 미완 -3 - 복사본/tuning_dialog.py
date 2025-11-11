@@ -248,21 +248,17 @@ class ImprovedTuningDialog(QDialog):
         self.setStyleSheet(style_sheet)
     
     def create_tab_apply_button(self, tab_name):
-        """탭별 적용 버튼 생성"""
-        apply_btn = QPushButton(f"{tab_name} 적용")
-        apply_btn.setProperty("class", "tab-apply")
+        """탭별 적용 버튼 생성 - 개발자 다이얼로그 스타일"""
+        apply_btn = QPushButton("Apply")
         apply_btn.setStyleSheet("""
             QPushButton {
-                background-color: #ff6b00;
-                border: 1px solid #ff8c00;
-                color: #ffffff;
+                background-color: #FF9800;
+                color: white;
                 font-weight: bold;
-                padding: 8px 16px;
-                border-radius: 4px;
+                padding: 6px 12px;
             }
             QPushButton:hover {
-                background-color: #ff8c00;
-                color: #1e1e2e;
+                background-color: #FFB74D;
             }
         """)
         # 한글 탭 이름을 그대로 전달 (apply_tab_settings에서 변환)
@@ -270,20 +266,11 @@ class ImprovedTuningDialog(QDialog):
         return apply_btn
 
     def create_tab_load_button(self, tab_name):
-        """탭별 로드 버튼 생성"""
+        """탭별 로드 버튼 생성 - 개발자 다이얼로그 스타일"""
         load_btn = QPushButton("Load")
         load_btn.setStyleSheet("""
             QPushButton {
-                background-color: #2e7d32;
-                border: 1px solid #4caf50;
-                color: #ffffff;
-                font-weight: bold;
-                padding: 8px 16px;
-                border-radius: 4px;
-            }
-            QPushButton:hover {
-                background-color: #4caf50;
-                color: #1e1e2e;
+                padding: 6px 12px;
             }
         """)
         # 한글 탭 이름을 그대로 전달 (load_tab_settings에서 변환)
