@@ -575,6 +575,15 @@ class DCCInterfaceDialog(QDialog):
                     self.rf_amp_temp_label.setText(f"{dcc_if['rf_amp_temp']:.1f} °C")
                     self.water_temp_label.setText(f"{dcc_if['water_temp']:.1f} °C")
 
+                    # 디버깅: ac_fail 비트 값 로그
+                    if 'ac_fail' in dcc_if['status_bits']:
+                        ac_fail_value = dcc_if['status_bits']['ac_fail']
+                        if hasattr(self.parent_window, 'log_manager'):
+                            self.parent_window.log_manager.write_log(
+                                f"[DEBUG] DCC ac_fail bit = {ac_fail_value} (status=0x{dcc_if['dcc_status']:08X})",
+                                "yellow"
+                            )
+
                     # 상태 비트 업데이트 (StatusIndicator 사용)
                     for key, indicator in self.status_indicators.items():
                         bit_value = dcc_if['status_bits'].get(key, False)
