@@ -856,7 +856,7 @@ class StatusMonitorDialog(QDialog):
             return False
             
     def update_status_from_parent(self):
-        # LED 깜빡임 (주황색)
+        # LED 깜빡임 (주황색) - 최소 150ms 유지
         self.status_led.setStyleSheet("color: #FF9800; font-size: 16px;")
 
         if self.check_connection():
@@ -878,9 +878,9 @@ class StatusMonitorDialog(QDialog):
                 for metric_id in ['forward_power', 'reflect_power', 'delivery_power', 'temperature']:
                     self.minimal_header.update_metric(metric_id, 0, "disconnected")
 
-        # LED 복구 (녹색)
+        # LED 복구 (녹색) - 150ms 지연
         if self.auto_refresh_enabled:
-            self.status_led.setStyleSheet("color: #4CAF50; font-size: 16px;")
+            QTimer.singleShot(150, lambda: self.status_led.setStyleSheet("color: #4CAF50; font-size: 16px;"))
     
     def parse_led_state(self, led_state_value):
         """LED 상태 비트별 파싱 - 문서 기준"""

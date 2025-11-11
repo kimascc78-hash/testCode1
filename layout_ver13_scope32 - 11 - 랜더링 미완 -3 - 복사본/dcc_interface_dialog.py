@@ -534,7 +534,7 @@ class DCCInterfaceDialog(QDialog):
 
     def load_status(self):
         """DCC 상태 조회"""
-        # LED 깜빡임 (주황색)
+        # LED 깜빡임 (주황색) - 최소 150ms 유지
         self.status_led.setStyleSheet("color: #FF9800; font-size: 16px;")
 
         if not self.parent_window:
@@ -591,9 +591,9 @@ class DCCInterfaceDialog(QDialog):
             for key, indicator in self.status_indicators.items():
                 indicator.set_status("disconnected", f"{key.replace('_', ' ').title()}: N/A")
 
-        # LED 복구 (녹색)
+        # LED 복구 (녹색) - 150ms 지연
         if self.auto_refresh_enabled:
-            self.status_led.setStyleSheet("color: #4CAF50; font-size: 16px;")
+            QTimer.singleShot(150, lambda: self.status_led.setStyleSheet("color: #4CAF50; font-size: 16px;"))
 
     def determine_status_type(self, bit_key, bit_value):
         """
