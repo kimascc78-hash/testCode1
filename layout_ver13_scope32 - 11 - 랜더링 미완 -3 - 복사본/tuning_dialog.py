@@ -978,22 +978,22 @@ class ImprovedTuningDialog(QDialog):
                 current_settings[key] = widget.text()
 
         # TuningSettingsManager를 통해 저장
-        if hasattr(self.parent_window, 'tuning_settings_manager'):
-            success, msg = self.parent_window.tuning_settings_manager.save_user_defaults(current_settings)
+        if hasattr(self.parent_window, 'tuning_manager'):
+            success, msg = self.parent_window.tuning_manager.save_user_defaults(current_settings)
             if success:
                 QMessageBox.information(self, "저장 완료", "현재 설정이 사용자 기본값으로 저장되었습니다.\n다음부터 '기본값 복원'시 이 값이 사용됩니다.")
             else:
                 QMessageBox.warning(self, "저장 실패", msg)
         else:
-            QMessageBox.warning(self, "오류", "TuningSettingsManager를 찾을 수 없습니다.")
+            QMessageBox.warning(self, "오류", "TuningManager를 찾을 수 없습니다.")
 
     def reset_to_defaults(self):
         """기본값으로 복원 (사용자 기본값 우선, 없으면 시스템 기본값)"""
         defaults = None
 
         # 1단계: 사용자 기본값 로드 시도
-        if hasattr(self.parent_window, 'tuning_settings_manager'):
-            success, user_defaults, msg = self.parent_window.tuning_settings_manager.load_user_defaults()
+        if hasattr(self.parent_window, 'tuning_manager'):
+            success, user_defaults, msg = self.parent_window.tuning_manager.load_user_defaults()
             if success:
                 defaults = user_defaults
                 restore_type = "사용자 기본값"
@@ -1022,8 +1022,8 @@ class ImprovedTuningDialog(QDialog):
 
         if reply == QMessageBox.Yes:
             # 사용자 기본값 삭제
-            if hasattr(self.parent_window, 'tuning_settings_manager'):
-                self.parent_window.tuning_settings_manager.delete_user_defaults()
+            if hasattr(self.parent_window, 'tuning_manager'):
+                self.parent_window.tuning_manager.delete_user_defaults()
 
             # 시스템 기본값으로 복원
             defaults = self.get_system_defaults()
