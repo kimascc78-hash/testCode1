@@ -759,53 +759,61 @@ class TuningSettingsManager:
             return False, None, f"Bank2 Parameters 데이터 생성 실패: {str(e)}"
     
     # ========================================
+    # === 헬퍼 메서드 (리팩토링) ===
+    # ========================================
+
+    def _add_command(self, commands, cmd, subcmd, data, description):
+        """명령어를 commands 리스트에 추가하는 헬퍼 메서드"""
+        commands.append({
+            'cmd': cmd,
+            'subcmd': subcmd,
+            'data': data,
+            'description': description
+        })
+
+    def _try_add_command(self, commands, create_func, cmd, subcmd, description, settings=None):
+        """데이터 생성 함수 호출 후 성공 시 명령어 추가"""
+        if settings is not None:
+            success, data, msg = create_func(settings)
+        else:
+            success, data, msg = create_func()
+
+        if success:
+            self._add_command(commands, cmd, subcmd, data, description)
+        return success
+
+    # ========================================
     # === 전체 튜닝 명령어 생성 ===
     # ========================================
-    
+
     def get_tuning_commands(self, settings):
         """튜닝 설정을 개별 명령어로 분리하여 반환 - 주파수 튜닝 명령어 추가"""
         commands = []
         
         try:
             # 1. 제어 모드 설정 (항상 전송)
-            success, data, msg = self.create_control_mode_data(settings)
-            if success:
-                commands.append({
-                    'cmd': RFProtocol.CMD_CONTROL_MODE_SET,
-                    'subcmd': RFProtocol.SUBCMD_CONTROL_MODE_SET,
-                    'data': data,
-                    'description': '제어 모드 설정'
-                })
-            
+            self._try_add_command(commands, self.create_control_mode_data,
+                                RFProtocol.CMD_CONTROL_MODE_SET,
+                                RFProtocol.SUBCMD_CONTROL_MODE_SET,
+                                '제어 모드 설정', settings)
+
             # 2. 조절 모드 설정 (항상 전송)
-            success, data, msg = self.create_regulation_mode_data(settings)
-            if success:
-                commands.append({
-                    'cmd': RFProtocol.CMD_REGULATION_MODE_SET,
-                    'subcmd': RFProtocol.SUBCMD_REGULATION_MODE_SET,
-                    'data': data,
-                    'description': '조절 모드 설정'
-                })
-            
+            self._try_add_command(commands, self.create_regulation_mode_data,
+                                RFProtocol.CMD_REGULATION_MODE_SET,
+                                RFProtocol.SUBCMD_REGULATION_MODE_SET,
+                                '조절 모드 설정', settings)
+
             # 3. 램프 설정 (항상 전송 - 0값도 포함)
-            success, data, msg = self.create_ramp_config_data(settings)
-            if success:
-                commands.append({
-                    'cmd': RFProtocol.CMD_RAMP_CONFIG_SET,
-                    'subcmd': RFProtocol.SUBCMD_RAMP_CONFIG_SET,
-                    'data': data,
-                    'description': '램프 설정'
-                })
-            
+            self._try_add_command(commands, self.create_ramp_config_data,
+                                RFProtocol.CMD_RAMP_CONFIG_SET,
+                                RFProtocol.SUBCMD_RAMP_CONFIG_SET,
+                                '램프 설정', settings)
+
             # 4. CEX 설정 (항상 전송 - 0값도 포함)
-            success, data, msg = self.create_cex_config_data(settings)
-            if success:
-                commands.append({
-                    'cmd': RFProtocol.CMD_CEX_CONFIG_SET,
-                    'subcmd': RFProtocol.SUBCMD_CEX_CONFIG_SET,
-                    'data': data,
-                    'description': 'CEX 설정'
-                })
+            self._try_add_command(commands, self.create_cex_config_data,
+                                RFProtocol.CMD_CEX_CONFIG_SET,
+                                RFProtocol.SUBCMD_CEX_CONFIG_SET,
+                                'CEX 설정', settings)
             
             # 5. Pulse 설정 
             tab_name = None
@@ -1030,149 +1038,94 @@ class TuningSettingsManager:
         try:
             if tab_name == "control":
                 # 제어 모드 설정
-                success, data, msg = self.create_control_mode_data(settings)
-                if success:
-                    commands.append({
-                        'cmd': RFProtocol.CMD_CONTROL_MODE_SET,
-                        'subcmd': RFProtocol.SUBCMD_CONTROL_MODE_SET,
-                        'data': data,
-                        'description': '제어 모드 설정'
-                    })
-                
+                self._try_add_command(commands, self.create_control_mode_data,
+                                    RFProtocol.CMD_CONTROL_MODE_SET,
+                                    RFProtocol.SUBCMD_CONTROL_MODE_SET,
+                                    '제어 모드 설정', settings)
+
                 # 조절 모드 설정
-                success, data, msg = self.create_regulation_mode_data(settings)
-                if success:
-                    commands.append({
-                        'cmd': RFProtocol.CMD_REGULATION_MODE_SET,
-                        'subcmd': RFProtocol.SUBCMD_REGULATION_MODE_SET,
-                        'data': data,
-                        'description': '조절 모드 설정'
-                    })
-                    
+                self._try_add_command(commands, self.create_regulation_mode_data,
+                                    RFProtocol.CMD_REGULATION_MODE_SET,
+                                    RFProtocol.SUBCMD_REGULATION_MODE_SET,
+                                    '조절 모드 설정', settings)
+
             elif tab_name == "ramp":
                 # 램프 설정
-                success, data, msg = self.create_ramp_config_data(settings)
-                if success:
-                    commands.append({
-                        'cmd': RFProtocol.CMD_RAMP_CONFIG_SET,
-                        'subcmd': RFProtocol.SUBCMD_RAMP_CONFIG_SET,
-                        'data': data,
-                        'description': '램프 설정'
-                    })
-                    
+                self._try_add_command(commands, self.create_ramp_config_data,
+                                    RFProtocol.CMD_RAMP_CONFIG_SET,
+                                    RFProtocol.SUBCMD_RAMP_CONFIG_SET,
+                                    '램프 설정', settings)
+
             elif tab_name == "cex":
                 # CEX 설정
-                success, data, msg = self.create_cex_config_data(settings)
-                if success:
-                    commands.append({
-                        'cmd': RFProtocol.CMD_CEX_CONFIG_SET,
-                        'subcmd': RFProtocol.SUBCMD_CEX_CONFIG_SET,
-                        'data': data,
-                        'description': 'CEX 설정'
-                    })
+                self._try_add_command(commands, self.create_cex_config_data,
+                                    RFProtocol.CMD_CEX_CONFIG_SET,
+                                    RFProtocol.SUBCMD_CEX_CONFIG_SET,
+                                    'CEX 설정', settings)
                     
             elif tab_name == "pulse":
                 # === 펌웨어 구조체 기준 Pulse 명령어 (10개 전체) ===
                 # 1. Pulsing Type (SUBCMD 0x01)
-                success, data, msg = self.create_pulsing_type_data(settings)
-                if success:
-                    commands.append({
-                        'cmd': RFProtocol.CMD_PULSE_SET,
-                        'subcmd': RFProtocol.SUBCMD_PULSE_TYPE,
-                        'data': data,
-                        'description': '펄싱 타입 설정'
-                    })
-                
+                self._try_add_command(commands, self.create_pulsing_type_data,
+                                    RFProtocol.CMD_PULSE_SET,
+                                    RFProtocol.SUBCMD_PULSE_TYPE,
+                                    '펄싱 타입 설정', settings)
+
                 # 2. Pulsing Mode (SUBCMD 0x02)
-                success, data, msg = self.create_pulsing_mode_data(settings)
-                if success:
-                    commands.append({
-                        'cmd': RFProtocol.CMD_PULSE_SET,
-                        'subcmd': RFProtocol.SUBCMD_PULSE_MODE,
-                        'data': data,
-                        'description': '펄싱 모드 설정'
-                    })
-                
+                self._try_add_command(commands, self.create_pulsing_mode_data,
+                                    RFProtocol.CMD_PULSE_SET,
+                                    RFProtocol.SUBCMD_PULSE_MODE,
+                                    '펄싱 모드 설정', settings)
+
                 # 3. Pulse On/Off (SUBCMD 0x03)
                 pulse_onoff = 1 if settings.get("Pulse On/Off", "Off") == "On" else 0
                 data = struct.pack('<B', pulse_onoff)
-                commands.append({
-                    'cmd': RFProtocol.CMD_PULSE_SET,
-                    'subcmd': RFProtocol.SUBCMD_PULSE_OFFON,  # ✅ 올바른 상수명
-                    'data': data,
-                    'description': '펄스 On/Off 설정'
-                })
-                
+                self._add_command(commands, RFProtocol.CMD_PULSE_SET,
+                                RFProtocol.SUBCMD_PULSE_OFFON,
+                                data, '펄스 On/Off 설정')
+
                 # 4. Sync Output (SUBCMD 0x04)
-                success, data, msg = self.create_sync_output_data(settings)
-                if success:
-                    commands.append({
-                        'cmd': RFProtocol.CMD_PULSE_SET,
-                        'subcmd': RFProtocol.SUBCMD_PULSE_SYNC_OUTPUT,
-                        'data': data,
-                        'description': '동기 출력 설정'
-                    })
-                
+                self._try_add_command(commands, self.create_sync_output_data,
+                                    RFProtocol.CMD_PULSE_SET,
+                                    RFProtocol.SUBCMD_PULSE_SYNC_OUTPUT,
+                                    '동기 출력 설정', settings)
+
                 # 5. Pulse Level (SUBCMD 0x05, 16바이트)
-                success, data, msg = self.create_pulse_level_data(settings)
-                if success:
-                    commands.append({
-                        'cmd': RFProtocol.CMD_PULSE_SET,
-                        'subcmd': RFProtocol.SUBCMD_PULSE_LEVEL,
-                        'data': data,
-                        'description': '펄스 레벨 설정'
-                    })
-                
+                self._try_add_command(commands, self.create_pulse_level_data,
+                                    RFProtocol.CMD_PULSE_SET,
+                                    RFProtocol.SUBCMD_PULSE_LEVEL,
+                                    '펄스 레벨 설정', settings)
+
                 # 6. Pulse Duty (SUBCMD 0x06, 16바이트)
-                success, data, msg = self.create_pulse_duty_data(settings)
-                if success:
-                    commands.append({
-                        'cmd': RFProtocol.CMD_PULSE_SET,
-                        'subcmd': RFProtocol.SUBCMD_PULSE_DUTY,
-                        'data': data,
-                        'description': '펄스 듀티 설정'
-                    })
-                
+                self._try_add_command(commands, self.create_pulse_duty_data,
+                                    RFProtocol.CMD_PULSE_SET,
+                                    RFProtocol.SUBCMD_PULSE_DUTY,
+                                    '펄스 듀티 설정', settings)
+
                 # 7. Output Sync Delay (SUBCMD 0x07)
-                success, data, msg = self.create_pulse_sync_out_delay_data(settings)
-                if success:
-                    commands.append({
-                        'cmd': RFProtocol.CMD_PULSE_SET,
-                        'subcmd': RFProtocol.SUBCMD_PULSE_SYNC_OUT_DELAY,
-                        'data': data,
-                        'description': '출력 동기 지연 설정'
-                    })
-                
+                self._try_add_command(commands, self.create_pulse_sync_out_delay_data,
+                                    RFProtocol.CMD_PULSE_SET,
+                                    RFProtocol.SUBCMD_PULSE_SYNC_OUT_DELAY,
+                                    '출력 동기 지연 설정', settings)
+
                 # 8. Input Sync Delay (SUBCMD 0x08)
-                success, data, msg = self.create_pulse_sync_in_delay_data(settings)
-                if success:
-                    commands.append({
-                        'cmd': RFProtocol.CMD_PULSE_SET,
-                        'subcmd': RFProtocol.SUBCMD_PULSE_SYNC_IN_DELAY,
-                        'data': data,
-                        'description': '입력 동기 지연 설정'
-                    })
-                
+                self._try_add_command(commands, self.create_pulse_sync_in_delay_data,
+                                    RFProtocol.CMD_PULSE_SET,
+                                    RFProtocol.SUBCMD_PULSE_SYNC_IN_DELAY,
+                                    '입력 동기 지연 설정', settings)
+
                 # 9. Width Control (SUBCMD 0x09)
-                success, data, msg = self.create_width_control_data(settings)
-                if success:
-                    commands.append({
-                        'cmd': RFProtocol.CMD_PULSE_SET,
-                        'subcmd': RFProtocol.SUBCMD_PULSE_WIDTH_CONTROL,
-                        'data': data,
-                        'description': '펄스 폭 제어 설정'
-                    })
-                
+                self._try_add_command(commands, self.create_width_control_data,
+                                    RFProtocol.CMD_PULSE_SET,
+                                    RFProtocol.SUBCMD_PULSE_WIDTH_CONTROL,
+                                    '펄스 폭 제어 설정', settings)
+
                 # 10. Pulse Frequency (SUBCMD 0x0A)
-                success, data, msg = self.create_pulse_frequency_data(settings)
-                if success:
-                    commands.append({
-                        'cmd': RFProtocol.CMD_PULSE_SET,
-                        'subcmd': RFProtocol.SUBCMD_PULSE_FREQ,
-                        'data': data,
-                        'description': '펄스 주파수 설정'
-                    })
-                    
+                self._try_add_command(commands, self.create_pulse_frequency_data,
+                                    RFProtocol.CMD_PULSE_SET,
+                                    RFProtocol.SUBCMD_PULSE_FREQUENCY,
+                                    '펄스 주파수 설정', settings)
+
             elif tab_name == "frequency":
                 # RF 주파수 설정 (기존)
                 success, data, msg = self.create_rf_frequency_data(settings)
