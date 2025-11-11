@@ -945,13 +945,9 @@ class ImprovedTuningDialog(QDialog):
     
     def apply_tab_settings(self, tab_name):
         """탭별 설정 적용 - 수정된 버전"""
-        # 디버깅을 위한 로그 출력
-        if hasattr(self.parent_window, 'write_log'):
-            self.parent_window.write_log(f"[DEBUG] 탭별 적용 시도: {tab_name}", "yellow")
-        
         # 현재 입력값들을 임시로 업데이트
         temp_settings = self.tuning_settings.copy()
-        
+
         # 현재 입력값들을 temp_settings에 반영
         for key, widget in self.inputs.items():
             if isinstance(widget, QComboBox):
@@ -960,33 +956,26 @@ class ImprovedTuningDialog(QDialog):
                 temp_settings[key] = str(widget.value())
             elif isinstance(widget, QLineEdit):
                 temp_settings[key] = widget.text()
-        
+
         # 유효성 검사 (네트워크 탭인 경우)
         if tab_name == "네트워크":
             if not self.validate_ip_address(temp_settings["IP Address"]):
                 QMessageBox.warning(self, "오류", "유효하지 않은 IP 주소입니다.")
                 return
-        
+
         # 영문 탭 이름으로 변환
         english_tab_name = self.tab_name_mapping.get(tab_name, tab_name.lower())
-        
-        if hasattr(self.parent_window, 'write_log'):
-            self.parent_window.write_log(f"[DEBUG] 탭 이름 변환: {tab_name} -> {english_tab_name}", "yellow")
-        
+
         # 탭별 설정값 추출
         tab_settings = self.get_tab_settings(english_tab_name)
-        
+
         if not tab_settings:
             error_msg = f"{tab_name} 탭의 설정을 찾을 수 없습니다. (영문명: {english_tab_name})"
             QMessageBox.warning(self, "오류", error_msg)
             if hasattr(self.parent_window, 'write_log'):
                 self.parent_window.write_log(f"[ERROR] {error_msg}", "red")
-                self.parent_window.write_log(f"[DEBUG] 사용 가능한 탭 키: {list(self.tab_keys.keys())}", "yellow")
             return
-        
-        if hasattr(self.parent_window, 'write_log'):
-            self.parent_window.write_log(f"[DEBUG] 추출된 설정: {tab_settings}", "yellow")
-        
+
         # 시그널 발생 - 영문 탭 이름으로 전송
         self.tab_applied.emit(english_tab_name, tab_settings)
         
@@ -1313,7 +1302,6 @@ class ImprovedTuningDialog(QDialog):
         """장비에서 현재 탭의 설정값 읽어오기"""
         # 한글 탭 이름을 영문 키로 변환
         tab_name = self.tab_name_mapping.get(tab_name_korean, tab_name_korean.lower())
-        print(f"[DEBUG] Loading settings for tab: {tab_name_korean} -> {tab_name}")
 
         # parent_window 확인
         if not hasattr(self, 'parent_window') or not self.parent_window:
@@ -1333,7 +1321,6 @@ class ImprovedTuningDialog(QDialog):
         try:
             # GET 명령어 목록 가져오기
             success, commands, msg = self.parent_window.tuning_manager.get_tab_read_commands(tab_name)
-            print(f"[DEBUG] GET commands generation: success={success}, count={len(commands) if commands else 0}, msg={msg}")
 
             if not success or not commands:
                 QMessageBox.warning(self, "오류", f"{tab_name_korean} 탭 읽기 명령어 생성 실패:\n{msg}")
@@ -1349,8 +1336,6 @@ class ImprovedTuningDialog(QDialog):
             # 각 명령어 순차 전송 (동기 모드)
             for i, cmd_info in enumerate(commands):
                 try:
-                    print(f"[DEBUG] Sending command {i+1}/{len(commands)}: {cmd_info['description']} (CMD=0x{cmd_info['cmd']:02X}, SUBCMD=0x{cmd_info['subcmd']:02X})")
-
                     # NetworkManager의 client_thread를 통해 명령어 전송
                     if not self.parent_window.network_manager.client_thread:
                         raise Exception("Client thread not initialized")
@@ -1364,22 +1349,17 @@ class ImprovedTuningDialog(QDialog):
                         sync=True
                     )
 
-                    print(f"[DEBUG] Command result: success={result.success}, has_response={result.response_data is not None}")
-
                     if result.success and result.response_data:
                         # 응답 파싱
                         from rf_protocol import RFProtocol
                         parsed = RFProtocol.parse_response(result.response_data)
-                        print(f"[DEBUG] Parsed response: {parsed is not None}")
 
                         if parsed and 'data' in parsed:
                             responses.append({
                                 'subcmd': parsed['subcmd'],
                                 'data': parsed['data']
                             })
-                            print(f"[DEBUG] Added response: subcmd=0x{parsed['subcmd']:02X}, data_len={len(parsed['data']) if parsed['data'] else 0}")
                         else:
-                            print(f"[DEBUG] Parsed data missing or invalid")
                             failed_commands.append(f"{cmd_info['description']} (파싱 실패)")
                     else:
                         error_msg = f"{cmd_info['description']}"
@@ -1388,19 +1368,15 @@ class ImprovedTuningDialog(QDialog):
                         else:
                             error_msg += " (응답 없음)"
                         failed_commands.append(error_msg)
-                        print(f"[DEBUG] Command failed: {error_msg}")
 
                     QApplication.processEvents()  # UI 응답성 유지
 
                 except Exception as e:
                     error_msg = f"{cmd_info['description']}: {str(e)}"
                     failed_commands.append(error_msg)
-                    print(f"[ERROR] Exception during command: {error_msg}")
                     import traceback
                     traceback.print_exc()
                     continue
-
-            print(f"[DEBUG] Total responses collected: {len(responses)}/{len(commands)}")
 
             # 응답이 없는 경우
             if not responses:
@@ -1415,13 +1391,10 @@ class ImprovedTuningDialog(QDialog):
 
             # 응답 파싱 및 설정 딕셔너리 생성
             success, settings, msg = self.parent_window.tuning_manager.parse_tab_responses(tab_name, responses)
-            print(f"[DEBUG] Response parsing: success={success}, settings_count={len(settings) if settings else 0}")
 
             if not success or not settings:
                 QMessageBox.warning(self, "오류", f"응답 파싱 실패:\n{msg}")
                 return
-
-            print(f"[DEBUG] Applying settings to UI: {list(settings.keys())}")
 
             # UI에 적용
             self.apply_defaults_to_ui(settings)
