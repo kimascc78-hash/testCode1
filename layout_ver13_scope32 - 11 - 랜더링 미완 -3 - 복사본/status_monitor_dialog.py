@@ -69,27 +69,27 @@ class StatusMessages:
     VOLTAGE_UNIT = "V"
 
 class StatusColors:
-    """상태별 색상 정의 클래스"""
-    
-    # 기본 상태 색상
-    NORMAL_BG = "#44ff44"      # 정상: 녹색
-    NORMAL_TEXT = "#000000"
-    
-    CAUTION_BG = "#ffff44"     # 주의: 노란색  
+    """상태별 색상 정의 클래스 - DCC Interface와 통일"""
+
+    # 기본 상태 색상 (DCC Interface와 동일한 Material Design 팔레트)
+    NORMAL_BG = "#4CAF50"      # 정상: 녹색 (Material Green 500)
+    NORMAL_TEXT = "#ffffff"
+
+    CAUTION_BG = "#FFC107"     # 주의: 황색 (Material Amber 500)
     CAUTION_TEXT = "#000000"
-    
-    WARNING_BG = "#ff8844"     # 경고: 주황색
+
+    WARNING_BG = "#FF9800"     # 경고: 주황색 (Material Orange 500)
     WARNING_TEXT = "#000000"
-    
-    ERROR_BG = "#ff4444"       # 오류: 빨간색
+
+    ERROR_BG = "#F44336"       # 오류: 빨간색 (Material Red 500)
     ERROR_TEXT = "#ffffff"
-    
-    INACTIVE_BG = "#888888"    # 비활성: 회색
+
+    INACTIVE_BG = "#9E9E9E"    # 비활성: 회색 (Material Grey 500)
     INACTIVE_TEXT = "#ffffff"
-    
-    SPECIAL_BG = "#4444ff"     # 특수: 파란색 (저온 등)
+
+    SPECIAL_BG = "#2196F3"     # 특수: 파란색 (Material Blue 500)
     SPECIAL_TEXT = "#ffffff"
-    
+
     DISCONNECTED_BG = "#555555"  # 연결끊김: 어두운 회색
     DISCONNECTED_TEXT = "#ffffff"
 
@@ -147,12 +147,12 @@ class DisplayFormats:
 # =============================================================================
 
 STATUS_COLORS = {
-    "normal": {"background": StatusColors.NORMAL_BG, "text": StatusColors.NORMAL_TEXT, "border": "#228822"},
-    "caution": {"background": StatusColors.CAUTION_BG, "text": StatusColors.CAUTION_TEXT, "border": "#cccc22"},
-    "warning": {"background": StatusColors.WARNING_BG, "text": StatusColors.WARNING_TEXT, "border": "#cc5522"},
-    "error": {"background": StatusColors.ERROR_BG, "text": StatusColors.ERROR_TEXT, "border": "#cc2222"},
-    "inactive": {"background": StatusColors.INACTIVE_BG, "text": StatusColors.INACTIVE_TEXT, "border": "#555555"},
-    "special": {"background": StatusColors.SPECIAL_BG, "text": StatusColors.SPECIAL_TEXT, "border": "#2222cc"},
+    "normal": {"background": StatusColors.NORMAL_BG, "text": StatusColors.NORMAL_TEXT, "border": "#388E3C"},
+    "caution": {"background": StatusColors.CAUTION_BG, "text": StatusColors.CAUTION_TEXT, "border": "#FFA000"},
+    "warning": {"background": StatusColors.WARNING_BG, "text": StatusColors.WARNING_TEXT, "border": "#F57C00"},
+    "error": {"background": StatusColors.ERROR_BG, "text": StatusColors.ERROR_TEXT, "border": "#D32F2F"},
+    "inactive": {"background": StatusColors.INACTIVE_BG, "text": StatusColors.INACTIVE_TEXT, "border": "#757575"},
+    "special": {"background": StatusColors.SPECIAL_BG, "text": StatusColors.SPECIAL_TEXT, "border": "#1976D2"},
     "disconnected": {"background": StatusColors.DISCONNECTED_BG, "text": StatusColors.DISCONNECTED_TEXT, "border": "#333333"}
 }
 
@@ -356,19 +356,19 @@ class MinimalHeaderWidget(QWidget):
         progress_info['fill'].setStyleSheet(color_style)
         
     def get_status_color_style(self, status_type):
-        """상태별 색상 스타일"""
+        """상태별 색상 스타일 - DCC Interface와 통일"""
         base_style = "QWidget { border-radius: 2px; "
-        
+
         if status_type == "error":
-            return base_style + "background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #ff4444, stop:1 #ff6666); }"
+            return base_style + "background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #F44336, stop:1 #E57373); }"
         elif status_type == "warning":
-            return base_style + "background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #ff8844, stop:1 #ffaa44); }"
+            return base_style + "background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #FF9800, stop:1 #FFB74D); }"
         elif status_type == "caution":
-            return base_style + "background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #ffff44, stop:1 #ffff88); }"
+            return base_style + "background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #FFC107, stop:1 #FFD54F); }"
         elif status_type == "disconnected":
             return base_style + "background-color: #666666; }"
         else:  # normal
-            return base_style + "background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #44ff44, stop:1 #66ff88); }"
+            return base_style + "background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #4CAF50, stop:1 #81C784); }"
 
 # =============================================================================
 # 상태 표시 위젯
