@@ -1358,11 +1358,408 @@ class TuningSettingsManager:
             elif tab_name == "network":
                 # 네트워크 설정은 장비로 전송하지 않음 (클라이언트 설정만)
                 pass
-            
+
             return True, commands, f"{tab_name} 탭 {len(commands)}개 명령어 생성 완료"
-            
+
         except Exception as e:
             return False, [], f"{tab_name} 탭 명령어 생성 실패: {str(e)}"
+
+    # ========================================
+    # === 장비에서 설정 읽기 (GET 명령어) ===
+    # ========================================
+
+    def get_tab_read_commands(self, tab_name):
+        """탭별 GET 명령어 목록 반환"""
+        try:
+            commands = []
+
+            if tab_name == "control":
+                # 제어 모드 조회
+                commands.append({
+                    'cmd': RFProtocol.CMD_CONTROL_MODE_GET,
+                    'subcmd': RFProtocol.SUBCMD_CONTROL_MODE_GET,
+                    'data': None,
+                    'description': '제어 모드 조회'
+                })
+                # 조절 모드 조회
+                commands.append({
+                    'cmd': RFProtocol.CMD_REGULATION_MODE_GET,
+                    'subcmd': RFProtocol.SUBCMD_REGULATION_MODE_GET,
+                    'data': None,
+                    'description': '조절 모드 조회'
+                })
+
+            elif tab_name == "ramp":
+                # 램프 설정 조회
+                commands.append({
+                    'cmd': RFProtocol.CMD_RAMP_CONFIG_GET,
+                    'subcmd': RFProtocol.SUBCMD_RAMP_CONFIG_GET,
+                    'data': None,
+                    'description': '램프 설정 조회'
+                })
+
+            elif tab_name == "cex":
+                # CEX 설정 조회
+                commands.append({
+                    'cmd': RFProtocol.CMD_CEX_CONFIG_GET,
+                    'subcmd': RFProtocol.SUBCMD_CEX_CONFIG_GET,
+                    'data': None,
+                    'description': 'CEX 설정 조회'
+                })
+
+            elif tab_name == "pulse":
+                # 펄스 설정 조회 (10개 항목)
+                pulse_subcmds = [
+                    (RFProtocol.SUBCMD_PULSE_TYPE, "펄스 타입"),
+                    (RFProtocol.SUBCMD_PULSE_MODE, "펄스 모드"),
+                    (RFProtocol.SUBCMD_PULSE_OFFON, "펄스 On/Off"),
+                    (RFProtocol.SUBCMD_PULSE_SYNC_OUTPUT, "싱크 출력"),
+                    (RFProtocol.SUBCMD_PULSE_LEVEL, "펄스 레벨"),
+                    (RFProtocol.SUBCMD_PULSE_DUTY, "펄스 듀티"),
+                    (RFProtocol.SUBCMD_PULSE_SYNC_OUT_DELAY, "출력 싱크 지연"),
+                    (RFProtocol.SUBCMD_PULSE_SYNC_IN_DELAY, "입력 싱크 지연"),
+                    (RFProtocol.SUBCMD_PULSE_WIDTH_CONTROL, "폭 제어"),
+                    (RFProtocol.SUBCMD_PULSE_FREQ, "펄스 주파수")
+                ]
+                for subcmd, desc in pulse_subcmds:
+                    commands.append({
+                        'cmd': RFProtocol.CMD_PULSE_GET,
+                        'subcmd': subcmd,
+                        'data': None,
+                        'description': f'{desc} 조회'
+                    })
+
+            elif tab_name == "frequency":
+                # RF 주파수 조회
+                commands.append({
+                    'cmd': RFProtocol.CMD_GET_FREQUENCY,
+                    'subcmd': RFProtocol.SUBCMD_GET_FREQUENCY,
+                    'data': None,
+                    'description': 'RF 주파수 조회'
+                })
+                # 주파수 튜닝 설정 조회
+                freq_tuning_subcmds = [
+                    (RFProtocol.SUBCMD_FREQ_TUNING_ENABLE, "주파수 튜닝 활성화"),
+                    (RFProtocol.SUBCMD_FREQ_TUNING_RETUNING, "재튜닝 모드"),
+                    (RFProtocol.SUBCMD_FREQ_TUNING_MODE, "설정 모드"),
+                    (RFProtocol.SUBCMD_FREQ_TUNING_MIN_FREQ, "최소 주파수"),
+                    (RFProtocol.SUBCMD_FREQ_TUNING_MAX_FREQ, "최대 주파수"),
+                    (RFProtocol.SUBCMD_FREQ_TUNING_START_FREQ, "시작 주파수"),
+                    (RFProtocol.SUBCMD_FREQ_TUNING_MIN_STEP, "최소 스텝"),
+                    (RFProtocol.SUBCMD_FREQ_TUNING_MAX_STEP, "최대 스텝"),
+                    (RFProtocol.SUBCMD_FREQ_TUNING_STOP_GAMMA, "정지 감마"),
+                    (RFProtocol.SUBCMD_FREQ_TUNING_RETURN_GAMMA, "복귀 감마")
+                ]
+                for subcmd, desc in freq_tuning_subcmds:
+                    commands.append({
+                        'cmd': RFProtocol.CMD_FREQUENCY_TUNING_GET,
+                        'subcmd': subcmd,
+                        'data': None,
+                        'description': f'{desc} 조회'
+                    })
+
+            elif tab_name == "bank":
+                # Bank 설정 조회
+                commands.append({
+                    'cmd': RFProtocol.CMD_BANK_GET,
+                    'subcmd': RFProtocol.SUBCMD_BANK1_ENABLE,
+                    'data': None,
+                    'description': 'Bank1 활성화 조회'
+                })
+                commands.append({
+                    'cmd': RFProtocol.CMD_BANK_GET,
+                    'subcmd': RFProtocol.SUBCMD_BANK1_EQUATION_ENABLE,
+                    'data': None,
+                    'description': 'Bank1 방정식 활성화 조회'
+                })
+                commands.append({
+                    'cmd': RFProtocol.CMD_BANK_GET,
+                    'subcmd': RFProtocol.SUBCMD_BANK1_PARAMS,
+                    'data': None,
+                    'description': 'Bank1 파라미터 조회'
+                })
+                commands.append({
+                    'cmd': RFProtocol.CMD_BANK_GET,
+                    'subcmd': RFProtocol.SUBCMD_BANK2_ENABLE,
+                    'data': None,
+                    'description': 'Bank2 활성화 조회'
+                })
+                commands.append({
+                    'cmd': RFProtocol.CMD_BANK_GET,
+                    'subcmd': RFProtocol.SUBCMD_BANK2_EQUATION_ENABLE,
+                    'data': None,
+                    'description': 'Bank2 방정식 활성화 조회'
+                })
+                commands.append({
+                    'cmd': RFProtocol.CMD_BANK_GET,
+                    'subcmd': RFProtocol.SUBCMD_BANK2_PARAMS,
+                    'data': None,
+                    'description': 'Bank2 파라미터 조회'
+                })
+
+            elif tab_name == "network":
+                # 네트워크는 장비에서 읽지 않음 (클라이언트 측 설정)
+                pass
+
+            return True, commands, f"{tab_name} 탭 {len(commands)}개 GET 명령어 생성 완료"
+
+        except Exception as e:
+            return False, [], f"{tab_name} 탭 GET 명령어 생성 실패: {str(e)}"
+
+    def parse_tab_responses(self, tab_name, responses):
+        """탭별 응답 통합 파싱 - 설정 딕셔너리 반환"""
+        try:
+            settings = {}
+
+            if tab_name == "control":
+                for response in responses:
+                    if response['subcmd'] == RFProtocol.SUBCMD_CONTROL_MODE_GET:
+                        settings['Control Mode'] = self._parse_control_mode(response['data'])
+                    elif response['subcmd'] == RFProtocol.SUBCMD_REGULATION_MODE_GET:
+                        settings['Regulation Mode'] = self._parse_regulation_mode(response['data'])
+
+            elif tab_name == "ramp":
+                for response in responses:
+                    if response['subcmd'] == RFProtocol.SUBCMD_RAMP_CONFIG_GET:
+                        ramp_settings = self._parse_ramp_config(response['data'])
+                        settings.update(ramp_settings)
+
+            elif tab_name == "cex":
+                for response in responses:
+                    if response['subcmd'] == RFProtocol.SUBCMD_CEX_CONFIG_GET:
+                        cex_settings = self._parse_cex_config(response['data'])
+                        settings.update(cex_settings)
+
+            elif tab_name == "pulse":
+                pulse_data = {}
+                for response in responses:
+                    subcmd = response['subcmd']
+                    data = response['data']
+                    if subcmd == RFProtocol.SUBCMD_PULSE_TYPE:
+                        pulse_data['type'] = struct.unpack('<B', data)[0] if data else 0
+                    elif subcmd == RFProtocol.SUBCMD_PULSE_MODE:
+                        pulse_data['mode'] = struct.unpack('<B', data)[0] if data else 0
+                    elif subcmd == RFProtocol.SUBCMD_PULSE_OFFON:
+                        pulse_data['offon'] = struct.unpack('<B', data)[0] if data else 0
+                    elif subcmd == RFProtocol.SUBCMD_PULSE_SYNC_OUTPUT:
+                        pulse_data['sync_output'] = struct.unpack('<B', data)[0] if data else 0
+                    elif subcmd == RFProtocol.SUBCMD_PULSE_LEVEL:
+                        pulse_data['levels'] = struct.unpack('<ffff', data) if len(data) >= 16 else (0, 0, 0, 0)
+                    elif subcmd == RFProtocol.SUBCMD_PULSE_DUTY:
+                        pulse_data['duties'] = struct.unpack('<ffff', data) if len(data) >= 16 else (0, 0, 0, 0)
+                    elif subcmd == RFProtocol.SUBCMD_PULSE_SYNC_OUT_DELAY:
+                        pulse_data['sync_out_delay'] = struct.unpack('<I', data)[0] if data else 0
+                    elif subcmd == RFProtocol.SUBCMD_PULSE_SYNC_IN_DELAY:
+                        pulse_data['sync_in_delay'] = struct.unpack('<I', data)[0] if data else 0
+                    elif subcmd == RFProtocol.SUBCMD_PULSE_WIDTH_CONTROL:
+                        pulse_data['width_control'] = struct.unpack('<I', data)[0] if data else 0
+                    elif subcmd == RFProtocol.SUBCMD_PULSE_FREQ:
+                        pulse_data['frequency'] = struct.unpack('<I', data)[0] if data else 0
+
+                settings.update(self._convert_pulse_data_to_settings(pulse_data))
+
+            elif tab_name == "frequency":
+                freq_data = {}
+                for response in responses:
+                    subcmd = response['subcmd']
+                    data = response['data']
+                    if subcmd == RFProtocol.SUBCMD_GET_FREQUENCY:
+                        freq_data['rf_frequency'] = struct.unpack('<f', data)[0] if len(data) >= 4 else 0.0
+                    elif subcmd == RFProtocol.SUBCMD_FREQ_TUNING_ENABLE:
+                        freq_data['tuning_enable'] = struct.unpack('<H', data)[0] if data else 0
+                    elif subcmd == RFProtocol.SUBCMD_FREQ_TUNING_RETUNING:
+                        freq_data['retuning'] = struct.unpack('<H', data)[0] if data else 0
+                    elif subcmd == RFProtocol.SUBCMD_FREQ_TUNING_MODE:
+                        freq_data['mode'] = struct.unpack('<H', data)[0] if data else 0
+                    elif subcmd == RFProtocol.SUBCMD_FREQ_TUNING_MIN_FREQ:
+                        freq_data['min_freq'] = struct.unpack('<f', data)[0] if len(data) >= 4 else 0.0
+                    elif subcmd == RFProtocol.SUBCMD_FREQ_TUNING_MAX_FREQ:
+                        freq_data['max_freq'] = struct.unpack('<f', data)[0] if len(data) >= 4 else 0.0
+                    elif subcmd == RFProtocol.SUBCMD_FREQ_TUNING_START_FREQ:
+                        freq_data['start_freq'] = struct.unpack('<f', data)[0] if len(data) >= 4 else 0.0
+                    elif subcmd == RFProtocol.SUBCMD_FREQ_TUNING_MIN_STEP:
+                        freq_data['min_step'] = struct.unpack('<f', data)[0] if len(data) >= 4 else 0.0
+                    elif subcmd == RFProtocol.SUBCMD_FREQ_TUNING_MAX_STEP:
+                        freq_data['max_step'] = struct.unpack('<f', data)[0] if len(data) >= 4 else 0.0
+                    elif subcmd == RFProtocol.SUBCMD_FREQ_TUNING_STOP_GAMMA:
+                        freq_data['stop_gamma'] = struct.unpack('<f', data)[0] if len(data) >= 4 else 0.0
+                    elif subcmd == RFProtocol.SUBCMD_FREQ_TUNING_RETURN_GAMMA:
+                        freq_data['return_gamma'] = struct.unpack('<f', data)[0] if len(data) >= 4 else 0.0
+
+                settings.update(self._convert_frequency_data_to_settings(freq_data))
+
+            elif tab_name == "bank":
+                bank_data = {}
+                for response in responses:
+                    subcmd = response['subcmd']
+                    data = response['data']
+                    if subcmd == RFProtocol.SUBCMD_BANK1_ENABLE:
+                        bank_data['bank1_enable'] = struct.unpack('<H', data)[0] if data else 0
+                    elif subcmd == RFProtocol.SUBCMD_BANK1_EQUATION_ENABLE:
+                        bank_data['bank1_eq_enable'] = struct.unpack('<H', data)[0] if data else 0
+                    elif subcmd == RFProtocol.SUBCMD_BANK1_PARAMS:
+                        if len(data) >= 20:
+                            bank_data['bank1_params'] = struct.unpack('<fffff', data)
+                    elif subcmd == RFProtocol.SUBCMD_BANK2_ENABLE:
+                        bank_data['bank2_enable'] = struct.unpack('<H', data)[0] if data else 0
+                    elif subcmd == RFProtocol.SUBCMD_BANK2_EQUATION_ENABLE:
+                        bank_data['bank2_eq_enable'] = struct.unpack('<H', data)[0] if data else 0
+                    elif subcmd == RFProtocol.SUBCMD_BANK2_PARAMS:
+                        if len(data) >= 20:
+                            bank_data['bank2_params'] = struct.unpack('<fffff', data)
+
+                settings.update(self._convert_bank_data_to_settings(bank_data))
+
+            return True, settings, f"{tab_name} 탭 응답 파싱 완료"
+
+        except Exception as e:
+            return False, {}, f"{tab_name} 탭 응답 파싱 실패: {str(e)}"
+
+    # ========================================
+    # === 개별 응답 파싱 헬퍼 함수들 ===
+    # ========================================
+
+    def _parse_control_mode(self, data):
+        """제어 모드 파싱"""
+        try:
+            if not data or len(data) < 2:
+                return "Ethernet"
+            mode_value = struct.unpack('<H', data)[0]
+            mode_map = {0: "User Port", 1: "Serial", 2: "Ethernet",
+                       3: "EtherCAT", 4: "Serial+User", 5: "Ethernet+User"}
+            return mode_map.get(mode_value, "Ethernet")
+        except:
+            return "Ethernet"
+
+    def _parse_regulation_mode(self, data):
+        """조절 모드 파싱"""
+        try:
+            if not data or len(data) < 2:
+                return "Forward Power"
+            mode_value = struct.unpack('<H', data)[0]
+            mode_map = {0: "Forward Power", 1: "Load Power", 2: "Voltage", 3: "Current"}
+            return mode_map.get(mode_value, "Forward Power")
+        except:
+            return "Forward Power"
+
+    def _parse_ramp_config(self, data):
+        """램프 설정 파싱"""
+        try:
+            if not data or len(data) < 20:
+                return {"Ramp Mode": "Disable", "Ramp Up Time": "0", "Ramp Down Time": "0"}
+
+            ramp_mode, ramp_up, ramp_down, _, _ = struct.unpack('<IIIII', data)
+            return {
+                "Ramp Mode": "Enable" if ramp_mode == 1 else "Disable",
+                "Ramp Up Time": str(ramp_up),
+                "Ramp Down Time": str(ramp_down)
+            }
+        except:
+            return {"Ramp Mode": "Disable", "Ramp Up Time": "0", "Ramp Down Time": "0"}
+
+    def _parse_cex_config(self, data):
+        """CEX 설정 파싱"""
+        try:
+            if not data or len(data) < 12:
+                return {"CEX Enable": "Disable", "CEX Mode": "Master",
+                       "CEX Output Phase": "0.0", "RF Output Phase": "0.0"}
+
+            cex_enable, cex_mode, cex_out_phase, rf_out_phase = struct.unpack('<HHff', data)
+            return {
+                "CEX Enable": "Enable" if cex_enable == 1 else "Disable",
+                "CEX Mode": "Master" if cex_mode == 0 else "Slave",
+                "CEX Output Phase": f"{cex_out_phase:.1f}",
+                "RF Output Phase": f"{rf_out_phase:.1f}"
+            }
+        except:
+            return {"CEX Enable": "Disable", "CEX Mode": "Master",
+                   "CEX Output Phase": "0.0", "RF Output Phase": "0.0"}
+
+    def _convert_pulse_data_to_settings(self, pulse_data):
+        """펄스 원시 데이터를 설정 딕셔너리로 변환"""
+        try:
+            type_map = {0: "Internal", 1: "External"}
+            mode_map = {0: "Fixed", 1: "Step"}
+
+            settings = {
+                "Pulsing Type": type_map.get(pulse_data.get('type', 0), "Internal"),
+                "Pulsing Mode": mode_map.get(pulse_data.get('mode', 0), "Fixed"),
+                "Pulse On/Off": "On" if pulse_data.get('offon', 0) == 1 else "Off",
+                "Sync Output": "Enable" if pulse_data.get('sync_output', 0) == 1 else "Disable"
+            }
+
+            levels = pulse_data.get('levels', (0, 0, 0, 0))
+            for i, level in enumerate(levels):
+                settings[f"Pulse{i} Level"] = f"{level:.1f}"
+
+            duties = pulse_data.get('duties', (0, 0, 0, 0))
+            for i, duty in enumerate(duties):
+                settings[f"Pulse{i} Duty"] = f"{duty:.1f}"
+
+            settings["Output Sync Delay"] = str(pulse_data.get('sync_out_delay', 0))
+            settings["Input Sync Delay"] = str(pulse_data.get('sync_in_delay', 0))
+            settings["Width Control"] = str(pulse_data.get('width_control', 0))
+            settings["Pulse Frequency"] = str(pulse_data.get('frequency', 0))
+
+            return settings
+        except:
+            return {}
+
+    def _convert_frequency_data_to_settings(self, freq_data):
+        """주파수 원시 데이터를 설정 딕셔너리로 변환"""
+        try:
+            retuning_map = {0: "Disable", 1: "Enable"}
+            mode_map = {0: "Auto", 1: "Manual"}
+
+            return {
+                "Set RF Frequency": f"{freq_data.get('rf_frequency', 0.0):.2f}",
+                "Freq Tuning": "Enable" if freq_data.get('tuning_enable', 0) == 1 else "Disable",
+                "Retuning Mode": retuning_map.get(freq_data.get('retuning', 0), "Disable"),
+                "Setting Mode": mode_map.get(freq_data.get('mode', 0), "Auto"),
+                "Min Frequency": f"{freq_data.get('min_freq', 0.0):.2f}",
+                "Max Frequency": f"{freq_data.get('max_freq', 0.0):.2f}",
+                "Start Frequency": f"{freq_data.get('start_freq', 0.0):.2f}",
+                "Min Step": f"{freq_data.get('min_step', 0.0):.3f}",
+                "Max Step": f"{freq_data.get('max_step', 0.0):.3f}",
+                "Stop Gamma": f"{freq_data.get('stop_gamma', 0.0):.3f}",
+                "Return Gamma": f"{freq_data.get('return_gamma', 0.0):.3f}"
+            }
+        except:
+            return {}
+
+    def _convert_bank_data_to_settings(self, bank_data):
+        """Bank 원시 데이터를 설정 딕셔너리로 변환"""
+        try:
+            settings = {
+                "Bank1 Enable": "Enable" if bank_data.get('bank1_enable', 0) == 1 else "Disable",
+                "Bank1 Equation Enable": "Enable" if bank_data.get('bank1_eq_enable', 0) == 1 else "Disable",
+                "Bank2 Enable": "Enable" if bank_data.get('bank2_enable', 0) == 1 else "Disable",
+                "Bank2 Equation Enable": "Enable" if bank_data.get('bank2_eq_enable', 0) == 1 else "Disable"
+            }
+
+            if 'bank1_params' in bank_data:
+                x0, a, b, c, d = bank_data['bank1_params']
+                settings.update({
+                    "Bank1 X0": f"{x0:.2f}",
+                    "Bank1 A": f"{a:.6f}",
+                    "Bank1 B": f"{b:.6f}",
+                    "Bank1 C": f"{c:.6f}",
+                    "Bank1 D": f"{d:.6f}"
+                })
+
+            if 'bank2_params' in bank_data:
+                x0, a, b, c, d = bank_data['bank2_params']
+                settings.update({
+                    "Bank2 X0": f"{x0:.2f}",
+                    "Bank2 A": f"{a:.6f}",
+                    "Bank2 B": f"{b:.6f}",
+                    "Bank2 C": f"{c:.6f}",
+                    "Bank2 D": f"{d:.6f}"
+                })
+
+            return settings
+        except:
+            return {}
 
 
 class StatusParser:

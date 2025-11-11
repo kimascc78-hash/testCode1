@@ -6,7 +6,7 @@ RF 장비 튜닝 설정을 위한 다이얼로그 - 탭별 적용 기능 수정
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QTabWidget, QWidget, QFormLayout,
     QPushButton, QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox, QGroupBox,
-    QScrollArea, QLabel, QMessageBox
+    QScrollArea, QLabel, QMessageBox, QApplication
 )
 from PyQt5.QtCore import Qt, pyqtSignal
 import ipaddress
@@ -268,6 +268,27 @@ class ImprovedTuningDialog(QDialog):
         # 한글 탭 이름을 그대로 전달 (apply_tab_settings에서 변환)
         apply_btn.clicked.connect(lambda: self.apply_tab_settings(tab_name))
         return apply_btn
+
+    def create_tab_load_button(self, tab_name):
+        """탭별 로드 버튼 생성"""
+        load_btn = QPushButton(f"장비에서 {tab_name} 설정 불러오기")
+        load_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #2e7d32;
+                border: 1px solid #4caf50;
+                color: #ffffff;
+                font-weight: bold;
+                padding: 8px 16px;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #4caf50;
+                color: #1e1e2e;
+            }
+        """)
+        # 한글 탭 이름을 그대로 전달 (load_tab_settings에서 변환)
+        load_btn.clicked.connect(lambda: self.load_tab_settings(tab_name))
+        return load_btn
     
     def create_control_tab(self, tab_widget):
         """제어 설정 탭"""
@@ -302,13 +323,17 @@ class ImprovedTuningDialog(QDialog):
         control_layout.addRow(regulation_label, regulation_mode)
         
         layout.addWidget(control_group)
-        
-        # 탭별 적용 버튼
+
+        # 로드 및 적용 버튼
+        button_layout = QHBoxLayout()
+        load_btn = self.create_tab_load_button("제어")
         apply_btn = self.create_tab_apply_button("제어")
-        layout.addWidget(apply_btn)
-        
+        button_layout.addWidget(load_btn)
+        button_layout.addWidget(apply_btn)
+        layout.addLayout(button_layout)
+
         layout.addStretch()
-        
+
         scroll.setWidget(scroll_widget)
         tab_layout = QVBoxLayout(tab)
         tab_layout.addWidget(scroll)
@@ -359,10 +384,14 @@ class ImprovedTuningDialog(QDialog):
         ramp_layout.addRow(ramp_down_label, ramp_down_time)
         
         layout.addWidget(ramp_group)
-        
-        # 탭별 적용 버튼
+
+        # 로드 및 적용 버튼
+        button_layout = QHBoxLayout()
+        load_btn = self.create_tab_load_button("램프")
         apply_btn = self.create_tab_apply_button("램프")
-        layout.addWidget(apply_btn)
+        button_layout.addWidget(load_btn)
+        button_layout.addWidget(apply_btn)
+        layout.addLayout(button_layout)
         
         layout.addStretch()
         
@@ -426,10 +455,14 @@ class ImprovedTuningDialog(QDialog):
         cex_layout.addRow(rf_output_label, rf_output_phase)
         
         layout.addWidget(cex_group)
-        
-        # 탭별 적용 버튼
+
+        # 로드 및 적용 버튼
+        button_layout = QHBoxLayout()
+        load_btn = self.create_tab_load_button("CEX")
         apply_btn = self.create_tab_apply_button("CEX")
-        layout.addWidget(apply_btn)
+        button_layout.addWidget(load_btn)
+        button_layout.addWidget(apply_btn)
+        layout.addLayout(button_layout)
         
         layout.addStretch()
         
@@ -560,10 +593,14 @@ class ImprovedTuningDialog(QDialog):
         pulse_layout.addRow(pulse_freq_label, pulse_freq)
         
         layout.addWidget(pulse_group)
-        
-        # 탭별 적용 버튼
+
+        # 로드 및 적용 버튼
+        button_layout = QHBoxLayout()
+        load_btn = self.create_tab_load_button("펄스")
         apply_btn = self.create_tab_apply_button("펄스")
-        layout.addWidget(apply_btn)
+        button_layout.addWidget(load_btn)
+        button_layout.addWidget(apply_btn)
+        layout.addLayout(button_layout)
         
         layout.addStretch()
         
@@ -715,10 +752,14 @@ class ImprovedTuningDialog(QDialog):
         step_layout.addRow(return_gamma_label, return_gamma)
         
         layout.addWidget(step_group)
-        
-        # 탭별 적용 버튼
+
+        # 로드 및 적용 버튼
+        button_layout = QHBoxLayout()
+        load_btn = self.create_tab_load_button("주파수")
         apply_btn = self.create_tab_apply_button("주파수")
-        layout.addWidget(apply_btn)
+        button_layout.addWidget(load_btn)
+        button_layout.addWidget(apply_btn)
+        layout.addLayout(button_layout)
         
         layout.addStretch()
         
@@ -1260,10 +1301,14 @@ class ImprovedTuningDialog(QDialog):
         bank2_layout.addRow(QLabel("D (상수):"), bank2_d)
         
         layout.addWidget(bank2_group)
-        
-        # 탭별 적용 버튼
+
+        # 로드 및 적용 버튼
+        button_layout = QHBoxLayout()
+        load_btn = self.create_tab_load_button("Bank")
         apply_btn = self.create_tab_apply_button("Bank")
-        layout.addWidget(apply_btn)
+        button_layout.addWidget(load_btn)
+        button_layout.addWidget(apply_btn)
+        layout.addLayout(button_layout)
         
         layout.addStretch()
         
@@ -1271,3 +1316,106 @@ class ImprovedTuningDialog(QDialog):
         tab_layout = QVBoxLayout(tab)
         tab_layout.addWidget(scroll)
         tab_widget.addTab(tab, "Bank")
+
+    def load_tab_settings(self, tab_name_korean):
+        """장비에서 현재 탭의 설정값 읽어오기"""
+        # 한글 탭 이름을 영문 키로 변환
+        tab_name = self.tab_name_mapping.get(tab_name_korean, tab_name_korean.lower())
+
+        # parent_window 확인
+        if not hasattr(self, 'parent_window') or not self.parent_window:
+            QMessageBox.warning(self, "오류", "Parent window를 찾을 수 없습니다.")
+            return
+
+        # tuning_manager 확인
+        if not hasattr(self.parent_window, 'tuning_manager'):
+            QMessageBox.warning(self, "오류", "TuningManager를 찾을 수 없습니다.")
+            return
+
+        # network_manager 확인
+        if not hasattr(self.parent_window, 'network_manager'):
+            QMessageBox.warning(self, "오류", "NetworkManager를 찾을 수 없습니다.")
+            return
+
+        try:
+            # GET 명령어 목록 가져오기
+            success, commands, msg = self.parent_window.tuning_manager.get_tab_read_commands(tab_name)
+            if not success or not commands:
+                QMessageBox.warning(self, "오류", f"{tab_name_korean} 탭 읽기 명령어 생성 실패:\n{msg}")
+                return
+
+            # 진행 상황 다이얼로그 표시 (모달로 생성하지 않고 정보만 표시)
+            QApplication.processEvents()  # UI 업데이트
+
+            # 응답 수집
+            responses = []
+            failed_commands = []
+
+            # 각 명령어 순차 전송 (동기 모드)
+            for i, cmd_info in enumerate(commands):
+                try:
+                    result = self.parent_window.network_manager.send_command(
+                        cmd_info['cmd'],
+                        cmd_info['subcmd'],
+                        cmd_info['data'],
+                        wait_response=True,
+                        timeout=3.0,
+                        sync=True
+                    )
+
+                    if result.success and result.response_data:
+                        # 응답 파싱
+                        from rf_protocol import RFProtocol
+                        parsed = RFProtocol.parse_response(result.response_data)
+                        if parsed:
+                            responses.append({
+                                'subcmd': parsed['subcmd'],
+                                'data': parsed['data']
+                            })
+                    else:
+                        failed_commands.append(cmd_info['description'])
+
+                    QApplication.processEvents()  # UI 응답성 유지
+
+                except Exception as e:
+                    failed_commands.append(f"{cmd_info['description']}: {str(e)}")
+                    continue
+
+            # 응답이 없는 경우
+            if not responses:
+                QMessageBox.warning(
+                    self, "오류",
+                    f"장비로부터 응답을 받지 못했습니다.\n실패한 명령어: {len(failed_commands)}/{len(commands)}"
+                )
+                return
+
+            # 응답 파싱 및 설정 딕셔너리 생성
+            success, settings, msg = self.parent_window.tuning_manager.parse_tab_responses(tab_name, responses)
+            if not success:
+                QMessageBox.warning(self, "오류", f"응답 파싱 실패:\n{msg}")
+                return
+
+            # UI에 적용
+            self.apply_defaults_to_ui(settings)
+
+            # 결과 메시지
+            success_count = len(responses)
+            total_count = len(commands)
+            if failed_commands:
+                QMessageBox.information(
+                    self, "로드 완료",
+                    f"장비에서 {tab_name_korean} 설정을 불러왔습니다.\n\n"
+                    f"성공: {success_count}/{total_count}\n"
+                    f"실패: {len(failed_commands)}\n\n"
+                    f"실패한 항목:\n" + "\n".join(failed_commands[:5])  # 최대 5개만 표시
+                )
+            else:
+                QMessageBox.information(
+                    self, "로드 완료",
+                    f"장비에서 {tab_name_korean} 설정을 성공적으로 불러왔습니다.\n({success_count}/{total_count} 항목)"
+                )
+
+        except Exception as e:
+            QMessageBox.critical(self, "오류", f"설정 로드 중 예외 발생:\n{str(e)}")
+            import traceback
+            traceback.print_exc()
