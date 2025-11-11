@@ -1364,7 +1364,11 @@ class ImprovedTuningDialog(QDialog):
                 try:
                     print(f"[DEBUG] Sending command {i+1}/{len(commands)}: {cmd_info['description']} (CMD=0x{cmd_info['cmd']:02X}, SUBCMD=0x{cmd_info['subcmd']:02X})")
 
-                    result = self.parent_window.network_manager.send_command(
+                    # NetworkManager의 client_thread를 통해 명령어 전송
+                    if not self.parent_window.network_manager.client_thread:
+                        raise Exception("Client thread not initialized")
+
+                    result = self.parent_window.network_manager.client_thread.send_command(
                         cmd_info['cmd'],
                         cmd_info['subcmd'],
                         cmd_info['data'],
