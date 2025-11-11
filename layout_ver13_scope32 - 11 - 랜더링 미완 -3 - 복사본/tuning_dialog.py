@@ -271,7 +271,7 @@ class ImprovedTuningDialog(QDialog):
 
     def create_tab_load_button(self, tab_name):
         """탭별 로드 버튼 생성"""
-        load_btn = QPushButton(f"장비에서 {tab_name} 설정 불러오기")
+        load_btn = QPushButton("Load")
         load_btn.setStyleSheet("""
             QPushButton {
                 background-color: #2e7d32;
@@ -1142,12 +1142,17 @@ class ImprovedTuningDialog(QDialog):
         for key, default_value in defaults.items():
             if key in self.inputs:
                 widget = self.inputs[key]
-                if isinstance(widget, QComboBox):
-                    widget.setCurrentText(default_value)
-                elif isinstance(widget, (QSpinBox, QDoubleSpinBox)):
-                    widget.setValue(float(default_value))
-                elif isinstance(widget, QLineEdit):
-                    widget.setText(default_value)
+                try:
+                    if isinstance(widget, QComboBox):
+                        widget.setCurrentText(str(default_value))
+                    elif isinstance(widget, QDoubleSpinBox):
+                        widget.setValue(float(default_value))
+                    elif isinstance(widget, QSpinBox):
+                        widget.setValue(int(float(default_value)))
+                    elif isinstance(widget, QLineEdit):
+                        widget.setText(str(default_value))
+                except Exception as e:
+                    print(f"[WARNING] Failed to set {key} = {default_value}: {e}")
     
     def validate_settings(self):
         """설정값 유효성 검사"""
@@ -1321,6 +1326,7 @@ class ImprovedTuningDialog(QDialog):
         """장비에서 현재 탭의 설정값 읽어오기"""
         # 한글 탭 이름을 영문 키로 변환
         tab_name = self.tab_name_mapping.get(tab_name_korean, tab_name_korean.lower())
+        print(f"[DEBUG] Loading settings for tab: {tab_name_korean} -> {tab_name}")
 
         # parent_window 확인
         if not hasattr(self, 'parent_window') or not self.parent_window:
@@ -1340,6 +1346,8 @@ class ImprovedTuningDialog(QDialog):
         try:
             # GET 명령어 목록 가져오기
             success, commands, msg = self.parent_window.tuning_manager.get_tab_read_commands(tab_name)
+            print(f"[DEBUG] GET commands generation: success={success}, count={len(commands) if commands else 0}, msg={msg}")
+
             if not success or not commands:
                 QMessageBox.warning(self, "오류", f"{tab_name_korean} 탭 읽기 명령어 생성 실패:\n{msg}")
                 return
@@ -1354,6 +1362,8 @@ class ImprovedTuningDialog(QDialog):
             # 각 명령어 순차 전송 (동기 모드)
             for i, cmd_info in enumerate(commands):
                 try:
+                    print(f"[DEBUG] Sending command {i+1}/{len(commands)}: {cmd_info['description']} (CMD=0x{cmd_info['cmd']:02X}, SUBCMD=0x{cmd_info['subcmd']:02X})")
+
                     result = self.parent_window.network_manager.send_command(
                         cmd_info['cmd'],
                         cmd_info['subcmd'],
@@ -1363,37 +1373,64 @@ class ImprovedTuningDialog(QDialog):
                         sync=True
                     )
 
+                    print(f"[DEBUG] Command result: success={result.success}, has_response={result.response_data is not None}")
+
                     if result.success and result.response_data:
                         # 응답 파싱
                         from rf_protocol import RFProtocol
                         parsed = RFProtocol.parse_response(result.response_data)
-                        if parsed:
+                        print(f"[DEBUG] Parsed response: {parsed is not None}")
+
+                        if parsed and 'data' in parsed:
                             responses.append({
                                 'subcmd': parsed['subcmd'],
                                 'data': parsed['data']
                             })
+                            print(f"[DEBUG] Added response: subcmd=0x{parsed['subcmd']:02X}, data_len={len(parsed['data']) if parsed['data'] else 0}")
+                        else:
+                            print(f"[DEBUG] Parsed data missing or invalid")
+                            failed_commands.append(f"{cmd_info['description']} (파싱 실패)")
                     else:
-                        failed_commands.append(cmd_info['description'])
+                        error_msg = f"{cmd_info['description']}"
+                        if not result.success:
+                            error_msg += f" (실패: {result.message})"
+                        else:
+                            error_msg += " (응답 없음)"
+                        failed_commands.append(error_msg)
+                        print(f"[DEBUG] Command failed: {error_msg}")
 
                     QApplication.processEvents()  # UI 응답성 유지
 
                 except Exception as e:
-                    failed_commands.append(f"{cmd_info['description']}: {str(e)}")
+                    error_msg = f"{cmd_info['description']}: {str(e)}"
+                    failed_commands.append(error_msg)
+                    print(f"[ERROR] Exception during command: {error_msg}")
+                    import traceback
+                    traceback.print_exc()
                     continue
+
+            print(f"[DEBUG] Total responses collected: {len(responses)}/{len(commands)}")
 
             # 응답이 없는 경우
             if not responses:
+                error_detail = "\n".join(failed_commands[:10]) if failed_commands else "알 수 없는 오류"
                 QMessageBox.warning(
                     self, "오류",
-                    f"장비로부터 응답을 받지 못했습니다.\n실패한 명령어: {len(failed_commands)}/{len(commands)}"
+                    f"장비로부터 응답을 받지 못했습니다.\n\n"
+                    f"실패: {len(failed_commands)}/{len(commands)}\n\n"
+                    f"실패 상세:\n{error_detail}"
                 )
                 return
 
             # 응답 파싱 및 설정 딕셔너리 생성
             success, settings, msg = self.parent_window.tuning_manager.parse_tab_responses(tab_name, responses)
-            if not success:
+            print(f"[DEBUG] Response parsing: success={success}, settings_count={len(settings) if settings else 0}")
+
+            if not success or not settings:
                 QMessageBox.warning(self, "오류", f"응답 파싱 실패:\n{msg}")
                 return
+
+            print(f"[DEBUG] Applying settings to UI: {list(settings.keys())}")
 
             # UI에 적용
             self.apply_defaults_to_ui(settings)
