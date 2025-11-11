@@ -1536,25 +1536,25 @@ class TuningSettingsManager:
                     subcmd = response['subcmd']
                     data = response['data']
                     if subcmd == RFProtocol.SUBCMD_PULSE_TYPE:
-                        pulse_data['type'] = struct.unpack('<B', data)[0] if data else 0
+                        pulse_data['type'] = struct.unpack('<B', data)[0] if len(data) >= 1 else 0
                     elif subcmd == RFProtocol.SUBCMD_PULSE_MODE:
-                        pulse_data['mode'] = struct.unpack('<B', data)[0] if data else 0
+                        pulse_data['mode'] = struct.unpack('<B', data)[0] if len(data) >= 1 else 0
                     elif subcmd == RFProtocol.SUBCMD_PULSE_OFFON:
-                        pulse_data['offon'] = struct.unpack('<B', data)[0] if data else 0
+                        pulse_data['offon'] = struct.unpack('<B', data)[0] if len(data) >= 1 else 0
                     elif subcmd == RFProtocol.SUBCMD_PULSE_SYNC_OUTPUT:
-                        pulse_data['sync_output'] = struct.unpack('<B', data)[0] if data else 0
+                        pulse_data['sync_output'] = struct.unpack('<B', data)[0] if len(data) >= 1 else 0
                     elif subcmd == RFProtocol.SUBCMD_PULSE_LEVEL:
                         pulse_data['levels'] = struct.unpack('<ffff', data) if len(data) >= 16 else (0, 0, 0, 0)
                     elif subcmd == RFProtocol.SUBCMD_PULSE_DUTY:
                         pulse_data['duties'] = struct.unpack('<ffff', data) if len(data) >= 16 else (0, 0, 0, 0)
                     elif subcmd == RFProtocol.SUBCMD_PULSE_SYNC_OUT_DELAY:
-                        pulse_data['sync_out_delay'] = struct.unpack('<I', data)[0] if data else 0
+                        pulse_data['sync_out_delay'] = struct.unpack('<I', data)[0] if len(data) >= 4 else 0
                     elif subcmd == RFProtocol.SUBCMD_PULSE_SYNC_IN_DELAY:
-                        pulse_data['sync_in_delay'] = struct.unpack('<I', data)[0] if data else 0
+                        pulse_data['sync_in_delay'] = struct.unpack('<I', data)[0] if len(data) >= 4 else 0
                     elif subcmd == RFProtocol.SUBCMD_PULSE_WIDTH_CONTROL:
-                        pulse_data['width_control'] = struct.unpack('<I', data)[0] if data else 0
+                        pulse_data['width_control'] = struct.unpack('<I', data)[0] if len(data) >= 4 else 0
                     elif subcmd == RFProtocol.SUBCMD_PULSE_FREQ:
-                        pulse_data['frequency'] = struct.unpack('<I', data)[0] if data else 0
+                        pulse_data['frequency'] = struct.unpack('<I', data)[0] if len(data) >= 4 else 0
 
                 settings.update(self._convert_pulse_data_to_settings(pulse_data))
 
@@ -1566,11 +1566,11 @@ class TuningSettingsManager:
                     if subcmd == RFProtocol.SUBCMD_GET_FREQUENCY:
                         freq_data['rf_frequency'] = struct.unpack('<f', data)[0] if len(data) >= 4 else 0.0
                     elif subcmd == RFProtocol.SUBCMD_FREQ_TUNING_ENABLE:
-                        freq_data['tuning_enable'] = struct.unpack('<H', data)[0] if data else 0
+                        freq_data['tuning_enable'] = struct.unpack('<B', data)[0] if len(data) >= 1 else 0
                     elif subcmd == RFProtocol.SUBCMD_FREQ_TUNING_RETUNING:
-                        freq_data['retuning'] = struct.unpack('<H', data)[0] if data else 0
+                        freq_data['retuning'] = struct.unpack('<B', data)[0] if len(data) >= 1 else 0
                     elif subcmd == RFProtocol.SUBCMD_FREQ_TUNING_MODE:
-                        freq_data['mode'] = struct.unpack('<H', data)[0] if data else 0
+                        freq_data['mode'] = struct.unpack('<B', data)[0] if len(data) >= 1 else 0
                     elif subcmd == RFProtocol.SUBCMD_FREQ_TUNING_MIN_FREQ:
                         freq_data['min_freq'] = struct.unpack('<f', data)[0] if len(data) >= 4 else 0.0
                     elif subcmd == RFProtocol.SUBCMD_FREQ_TUNING_MAX_FREQ:
@@ -1594,16 +1594,16 @@ class TuningSettingsManager:
                     subcmd = response['subcmd']
                     data = response['data']
                     if subcmd == RFProtocol.SUBCMD_BANK1_ENABLE:
-                        bank_data['bank1_enable'] = struct.unpack('<H', data)[0] if data else 0
+                        bank_data['bank1_enable'] = struct.unpack('<H', data)[0] if len(data) >= 2 else 0
                     elif subcmd == RFProtocol.SUBCMD_BANK1_EQUATION_ENABLE:
-                        bank_data['bank1_eq_enable'] = struct.unpack('<H', data)[0] if data else 0
+                        bank_data['bank1_eq_enable'] = struct.unpack('<H', data)[0] if len(data) >= 2 else 0
                     elif subcmd == RFProtocol.SUBCMD_BANK1_PARAMS:
                         if len(data) >= 20:
                             bank_data['bank1_params'] = struct.unpack('<fffff', data)
                     elif subcmd == RFProtocol.SUBCMD_BANK2_ENABLE:
-                        bank_data['bank2_enable'] = struct.unpack('<H', data)[0] if data else 0
+                        bank_data['bank2_enable'] = struct.unpack('<H', data)[0] if len(data) >= 2 else 0
                     elif subcmd == RFProtocol.SUBCMD_BANK2_EQUATION_ENABLE:
-                        bank_data['bank2_eq_enable'] = struct.unpack('<H', data)[0] if data else 0
+                        bank_data['bank2_eq_enable'] = struct.unpack('<H', data)[0] if len(data) >= 2 else 0
                     elif subcmd == RFProtocol.SUBCMD_BANK2_PARAMS:
                         if len(data) >= 20:
                             bank_data['bank2_params'] = struct.unpack('<fffff', data)
