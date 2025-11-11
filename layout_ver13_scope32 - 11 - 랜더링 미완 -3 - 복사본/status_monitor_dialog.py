@@ -423,11 +423,8 @@ class StatusMonitorDialog(QDialog):
 
         # 자동 갱신 설정
         self.auto_refresh_enabled = True  # 기본값: 활성화
-        self.refresh_interval = 1000  # 기본값: 1000ms (1초)
-        self.remaining_time = self.refresh_interval  # 남은 시간 (ms)
+        self.refresh_interval = 500  # 기본값: 500ms (원래대로 복원)
         self.is_refreshing = False  # 갱신 중 플래그
-        self.refresh_animation_icons = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
-        self.refresh_animation_step = 0
 
         # 설정 매니저 참조 추가
         self.settings_manager = None
@@ -528,7 +525,7 @@ class StatusMonitorDialog(QDialog):
         self.refresh_interval_combo.addItems([
             "100ms", "200ms", "500ms", "1000ms", "2000ms", "3000ms", "5000ms"
         ])
-        self.refresh_interval_combo.setCurrentText("1000ms")
+        self.refresh_interval_combo.setCurrentText("500ms")
         self.refresh_interval_combo.setStyleSheet("""
             QComboBox {
                 background-color: #3b4252;
@@ -575,10 +572,10 @@ class StatusMonitorDialog(QDialog):
         """)
         refresh_control_layout.addWidget(self.manual_refresh_btn)
 
-        # 카운트다운 라벨
-        self.countdown_label = QLabel("⏱ --")
-        self.countdown_label.setStyleSheet("color: #88c0d0; font-size: 11px; font-weight: bold;")
-        refresh_control_layout.addWidget(self.countdown_label)
+        # LED 표시등 (갱신 중 깜빡임)
+        self.status_led = QLabel("●")
+        self.status_led.setStyleSheet("color: #4CAF50; font-size: 16px;")
+        refresh_control_layout.addWidget(self.status_led)
 
         main_layout.addLayout(refresh_control_layout)
 
@@ -790,50 +787,15 @@ class StatusMonitorDialog(QDialog):
         self.update_timer = QTimer(self)
         self.update_timer.timeout.connect(self.update_status_from_parent)
 
-        # 카운트다운 타이머 (100ms 간격)
-        self.countdown_timer = QTimer(self)
-        self.countdown_timer.timeout.connect(self.update_countdown)
-
         if self.auto_refresh_enabled:
-            self.remaining_time = self.refresh_interval
             self.update_timer.start(self.refresh_interval)
-            self.countdown_timer.start(100)  # 100ms 간격
-
-    def update_countdown(self):
-        """카운트다운 업데이트 (100ms마다 호출)"""
-        if self.is_refreshing:
-            # 갱신 중 애니메이션
-            icon = self.refresh_animation_icons[self.refresh_animation_step]
-            self.manual_refresh_btn.setText(f"{icon} Refreshing...")
-            self.countdown_label.setText(f"{icon} Updating...")
-            self.refresh_animation_step = (self.refresh_animation_step + 1) % len(self.refresh_animation_icons)
-        elif self.auto_refresh_enabled:
-            # 카운트다운 표시
-            self.remaining_time -= 100
-            if self.remaining_time < 0:
-                self.remaining_time = self.refresh_interval
-
-            time_text = self.format_time(self.remaining_time)
-            self.countdown_label.setText(f"⏱ {time_text}")
-        else:
-            # 자동 갱신 꺼짐
-            self.countdown_label.setText("⏱ --")
-
-    def format_time(self, ms):
-        """시간 포맷팅 (스마트 표시)"""
-        if ms >= 1000:
-            seconds = ms / 1000.0
-            return f"{seconds:.1f}s"
-        else:
-            return f"{ms}ms"
 
     def toggle_auto_refresh(self, state):
         """자동 갱신 on/off 토글"""
         self.auto_refresh_enabled = (state == Qt.Checked)
         if self.auto_refresh_enabled:
-            self.remaining_time = self.refresh_interval
             self.update_timer.start(self.refresh_interval)
-            self.countdown_timer.start(100)
+            self.status_led.setStyleSheet("color: #4CAF50; font-size: 16px;")
             if hasattr(self.parent_window, 'log_manager'):
                 self.parent_window.log_manager.write_log(
                     f"[INFO] 자동 갱신 활성화: {self.refresh_interval}ms",
@@ -841,8 +803,7 @@ class StatusMonitorDialog(QDialog):
                 )
         else:
             self.update_timer.stop()
-            self.countdown_timer.stop()
-            self.countdown_label.setText("⏱ --")
+            self.status_led.setStyleSheet("color: #757575; font-size: 16px;")
             if hasattr(self.parent_window, 'log_manager'):
                 self.parent_window.log_manager.write_log(
                     "[INFO] 자동 갱신 비활성화",
@@ -851,10 +812,9 @@ class StatusMonitorDialog(QDialog):
 
     def change_refresh_interval(self, text):
         """갱신 간격 변경"""
-        # "1000ms" -> 1000 변환
+        # "500ms" -> 500 변환
         interval = int(text.replace("ms", ""))
         self.refresh_interval = interval
-        self.remaining_time = self.refresh_interval  # 남은 시간 리셋
 
         # 타이머가 실행 중이면 재시작
         if self.auto_refresh_enabled and self.update_timer.isActive():
@@ -896,9 +856,8 @@ class StatusMonitorDialog(QDialog):
             return False
             
     def update_status_from_parent(self):
-        # 갱신 시작 플래그
-        self.is_refreshing = True
-        self.remaining_time = self.refresh_interval  # 타이머 리셋
+        # LED 깜빡임 (주황색)
+        self.status_led.setStyleSheet("color: #FF9800; font-size: 16px;")
 
         if self.check_connection():
             self.connection_label.setText(StatusMessages.CONNECTION_ESTABLISHED)
@@ -919,9 +878,9 @@ class StatusMonitorDialog(QDialog):
                 for metric_id in ['forward_power', 'reflect_power', 'delivery_power', 'temperature']:
                     self.minimal_header.update_metric(metric_id, 0, "disconnected")
 
-        # 갱신 완료
-        self.is_refreshing = False
-        self.manual_refresh_btn.setText("⟳ Refresh Now")
+        # LED 복구 (녹색)
+        if self.auto_refresh_enabled:
+            self.status_led.setStyleSheet("color: #4CAF50; font-size: 16px;")
     
     def parse_led_state(self, led_state_value):
         """LED 상태 비트별 파싱 - 문서 기준"""
@@ -1202,7 +1161,6 @@ class StatusMonitorDialog(QDialog):
     def refresh_status(self):
         """수동 새로 고침"""
         self.status_update_requested.emit()
-        self.remaining_time = self.refresh_interval  # 타이머 리셋
         self.update_status_from_parent()  # 즉시 업데이트
 
         if self.check_connection():
@@ -1215,8 +1173,6 @@ class StatusMonitorDialog(QDialog):
     def closeEvent(self, event):
         if self.update_timer:
             self.update_timer.stop()
-        if hasattr(self, 'countdown_timer') and self.countdown_timer:
-            self.countdown_timer.stop()
         super().closeEvent(event)
         
         

@@ -28,10 +28,7 @@ class DCCInterfaceDialog(QDialog):
         # 자동 갱신 설정
         self.auto_refresh_enabled = True  # 기본값: 활성화
         self.refresh_interval = 1000  # 기본값: 1000ms (1초)
-        self.remaining_time = self.refresh_interval  # 남은 시간 (ms)
         self.is_refreshing = False  # 갱신 중 플래그
-        self.refresh_animation_icons = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
-        self.refresh_animation_step = 0
 
         # 비트별 상태 타입 정의 (0일 때의 상태)
         # "normal_on_zero": True이면 0일 때 정상, False이면 1일 때 정상
@@ -78,10 +75,6 @@ class DCCInterfaceDialog(QDialog):
         # 자동 갱신 타이머
         self.auto_refresh_timer = QTimer()
         self.auto_refresh_timer.timeout.connect(self.load_status)
-
-        # 카운트다운 타이머 (100ms 간격)
-        self.countdown_timer = QTimer()
-        self.countdown_timer.timeout.connect(self.update_countdown)
 
         self.init_ui()
 
@@ -190,9 +183,7 @@ class DCCInterfaceDialog(QDialog):
 
         # 자동 갱신 시작 (초기화 완료 후)
         if self.auto_refresh_enabled:
-            self.remaining_time = self.refresh_interval
             self.auto_refresh_timer.start(self.refresh_interval)
-            self.countdown_timer.start(100)  # 100ms 간격
             self.load_status()  # 즉시 한 번 로드
 
     def create_monitor_section(self):
@@ -261,10 +252,10 @@ class DCCInterfaceDialog(QDialog):
         """)
         refresh_control_layout.addWidget(self.manual_refresh_btn)
 
-        # 카운트다운 라벨
-        self.countdown_label = QLabel("⏱ --")
-        self.countdown_label.setStyleSheet("color: #88c0d0; font-size: 11px; font-weight: bold;")
-        refresh_control_layout.addWidget(self.countdown_label)
+        # LED 표시등 (갱신 중 깜빡임)
+        self.status_led = QLabel("●")
+        self.status_led.setStyleSheet("color: #4CAF50; font-size: 16px;")
+        refresh_control_layout.addWidget(self.status_led)
 
         layout.addLayout(refresh_control_layout)
 
@@ -499,41 +490,12 @@ class DCCInterfaceDialog(QDialog):
         line.setStyleSheet("background-color: #4c566a;")
         return line
 
-    def update_countdown(self):
-        """카운트다운 업데이트 (100ms마다 호출)"""
-        if self.is_refreshing:
-            # 갱신 중 애니메이션
-            icon = self.refresh_animation_icons[self.refresh_animation_step]
-            self.manual_refresh_btn.setText(f"{icon} Refreshing...")
-            self.countdown_label.setText(f"{icon} Updating...")
-            self.refresh_animation_step = (self.refresh_animation_step + 1) % len(self.refresh_animation_icons)
-        elif self.auto_refresh_enabled:
-            # 카운트다운 표시
-            self.remaining_time -= 100
-            if self.remaining_time < 0:
-                self.remaining_time = self.refresh_interval
-
-            time_text = self.format_time(self.remaining_time)
-            self.countdown_label.setText(f"⏱ {time_text}")
-        else:
-            # 자동 갱신 꺼짐
-            self.countdown_label.setText("⏱ --")
-
-    def format_time(self, ms):
-        """시간 포맷팅 (스마트 표시)"""
-        if ms >= 1000:
-            seconds = ms / 1000.0
-            return f"{seconds:.1f}s"
-        else:
-            return f"{ms}ms"
-
     def toggle_auto_refresh(self, state):
         """자동 갱신 on/off 토글"""
         self.auto_refresh_enabled = (state == Qt.Checked)
         if self.auto_refresh_enabled:
-            self.remaining_time = self.refresh_interval
             self.auto_refresh_timer.start(self.refresh_interval)
-            self.countdown_timer.start(100)
+            self.status_led.setStyleSheet("color: #4CAF50; font-size: 16px;")
             self.load_status()  # 즉시 한 번 로드
             if hasattr(self.parent_window, 'log_manager'):
                 self.parent_window.log_manager.write_log(
@@ -542,8 +504,7 @@ class DCCInterfaceDialog(QDialog):
                 )
         else:
             self.auto_refresh_timer.stop()
-            self.countdown_timer.stop()
-            self.countdown_label.setText("⏱ --")
+            self.status_led.setStyleSheet("color: #757575; font-size: 16px;")
             if hasattr(self.parent_window, 'log_manager'):
                 self.parent_window.log_manager.write_log(
                     "[INFO] DCC 자동 갱신 비활성화",
@@ -555,7 +516,6 @@ class DCCInterfaceDialog(QDialog):
         # "1000ms" -> 1000 변환
         interval = int(text.replace("ms", ""))
         self.refresh_interval = interval
-        self.remaining_time = self.refresh_interval  # 남은 시간 리셋
 
         # 타이머가 실행 중이면 재시작
         if self.auto_refresh_enabled and self.auto_refresh_timer.isActive():
@@ -570,32 +530,27 @@ class DCCInterfaceDialog(QDialog):
 
     def manual_refresh(self):
         """수동 새로 고침"""
-        self.remaining_time = self.refresh_interval  # 타이머 리셋
         self.load_status()
 
     def load_status(self):
         """DCC 상태 조회"""
-        # 갱신 시작 플래그
-        self.is_refreshing = True
-        self.remaining_time = self.refresh_interval  # 타이머 리셋
+        # LED 깜빡임 (주황색)
+        self.status_led.setStyleSheet("color: #FF9800; font-size: 16px;")
 
         if not self.parent_window:
-            self.is_refreshing = False
-            self.manual_refresh_btn.setText("⟳ Refresh Now")
+            self.status_led.setStyleSheet("color: #4CAF50; font-size: 16px;")
             return
 
         # 네트워크 매니저 확인
         if not hasattr(self.parent_window, 'network_manager'):
-            self.is_refreshing = False
-            self.manual_refresh_btn.setText("⟳ Refresh Now")
+            self.status_led.setStyleSheet("color: #4CAF50; font-size: 16px;")
             return
 
         if not self.parent_window.network_manager.client_thread:
             # 연결 없음 상태로 표시
             for key, indicator in self.status_indicators.items():
                 indicator.set_status("disconnected", f"{key.replace('_', ' ').title()}: N/A")
-            self.is_refreshing = False
-            self.manual_refresh_btn.setText("⟳ Refresh Now")
+            self.status_led.setStyleSheet("color: #4CAF50; font-size: 16px;")
             return
 
         # CMD_SYSTEM_CONTROL + SUBCMD_GET_DCC_IF
@@ -636,9 +591,9 @@ class DCCInterfaceDialog(QDialog):
             for key, indicator in self.status_indicators.items():
                 indicator.set_status("disconnected", f"{key.replace('_', ' ').title()}: N/A")
 
-        # 갱신 완료
-        self.is_refreshing = False
-        self.manual_refresh_btn.setText("⟳ Refresh Now")
+        # LED 복구 (녹색)
+        if self.auto_refresh_enabled:
+            self.status_led.setStyleSheet("color: #4CAF50; font-size: 16px;")
 
     def determine_status_type(self, bit_key, bit_value):
         """
@@ -668,6 +623,4 @@ class DCCInterfaceDialog(QDialog):
         """다이얼로그 닫기"""
         if self.auto_refresh_timer.isActive():
             self.auto_refresh_timer.stop()
-        if hasattr(self, 'countdown_timer') and self.countdown_timer.isActive():
-            self.countdown_timer.stop()
         super().closeEvent(event)
