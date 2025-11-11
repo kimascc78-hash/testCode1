@@ -83,14 +83,26 @@ class ImprovedTuningDialog(QDialog):
         
         # 버튼 레이아웃
         button_layout = QHBoxLayout()
-        
+
+        # 현재 값을 기본값으로 저장 버튼
+        save_default_btn = QPushButton("현재 값을 기본값으로 저장")
+        save_default_btn.setStyleSheet("background-color: #2e7d32; font-weight: bold;")
+        save_default_btn.clicked.connect(self.save_as_default)
+        button_layout.addWidget(save_default_btn)
+
         # 기본값 복원 버튼
         reset_btn = QPushButton("기본값 복원")
         reset_btn.clicked.connect(self.reset_to_defaults)
         button_layout.addWidget(reset_btn)
-        
+
+        # 시스템 기본값으로 복원 버튼
+        system_reset_btn = QPushButton("시스템 기본값 복원")
+        system_reset_btn.setStyleSheet("background-color: #c62828; font-weight: bold;")
+        system_reset_btn.clicked.connect(self.reset_to_system_defaults)
+        button_layout.addWidget(system_reset_btn)
+
         button_layout.addStretch()
-        
+
         # 취소/전체 적용 버튼
         cancel_btn = QPushButton("취소")
         cancel_btn.clicked.connect(self.reject)
@@ -953,11 +965,77 @@ class ImprovedTuningDialog(QDialog):
         # 성공 메시지는 부모 윈도우에서 처리 후 표시하도록 변경
         # QMessageBox.information(self, "적용 완료", f"{tab_name} 설정이 장비에 적용되었습니다.")
     
+    def save_as_default(self):
+        """현재 설정을 사용자 기본값으로 저장"""
+        # 현재 UI의 모든 값을 읽어옴
+        current_settings = {}
+        for key, widget in self.inputs.items():
+            if isinstance(widget, QComboBox):
+                current_settings[key] = widget.currentText()
+            elif isinstance(widget, (QSpinBox, QDoubleSpinBox)):
+                current_settings[key] = str(widget.value())
+            elif isinstance(widget, QLineEdit):
+                current_settings[key] = widget.text()
+
+        # TuningSettingsManager를 통해 저장
+        if hasattr(self.parent_window, 'tuning_settings_manager'):
+            success, msg = self.parent_window.tuning_settings_manager.save_user_defaults(current_settings)
+            if success:
+                QMessageBox.information(self, "저장 완료", "현재 설정이 사용자 기본값으로 저장되었습니다.\n다음부터 '기본값 복원'시 이 값이 사용됩니다.")
+            else:
+                QMessageBox.warning(self, "저장 실패", msg)
+        else:
+            QMessageBox.warning(self, "오류", "TuningSettingsManager를 찾을 수 없습니다.")
+
     def reset_to_defaults(self):
-        """기본값으로 복원"""
-        defaults = {
+        """기본값으로 복원 (사용자 기본값 우선, 없으면 시스템 기본값)"""
+        defaults = None
+
+        # 1단계: 사용자 기본값 로드 시도
+        if hasattr(self.parent_window, 'tuning_settings_manager'):
+            success, user_defaults, msg = self.parent_window.tuning_settings_manager.load_user_defaults()
+            if success:
+                defaults = user_defaults
+                restore_type = "사용자 기본값"
+            else:
+                # 사용자 기본값 없음 -> 시스템 기본값 사용
+                restore_type = "시스템 기본값"
+
+        # 2단계: 기본값이 없으면 시스템 기본값 사용
+        if defaults is None:
+            defaults = self.get_system_defaults()
+            restore_type = "시스템 기본값"
+
+        # 3단계: UI에 기본값 적용
+        self.apply_defaults_to_ui(defaults)
+
+        QMessageBox.information(self, "복원 완료", f"모든 설정이 {restore_type}으로 복원되었습니다.")
+
+    def reset_to_system_defaults(self):
+        """시스템 기본값으로 강제 복원"""
+        reply = QMessageBox.question(
+            self, "확인",
+            "사용자 기본값을 삭제하고 시스템 기본값으로 복원하시겠습니까?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+
+        if reply == QMessageBox.Yes:
+            # 사용자 기본값 삭제
+            if hasattr(self.parent_window, 'tuning_settings_manager'):
+                self.parent_window.tuning_settings_manager.delete_user_defaults()
+
+            # 시스템 기본값으로 복원
+            defaults = self.get_system_defaults()
+            self.apply_defaults_to_ui(defaults)
+
+            QMessageBox.information(self, "복원 완료", "모든 설정이 시스템 기본값으로 복원되었습니다.")
+
+    def get_system_defaults(self):
+        """시스템 기본값 반환"""
+        return {
             "Control Mode": "User Port",
-            "Regulation Mode": "Forward Power", 
+            "Regulation Mode": "Forward Power",
             "Ramp Mode": "Disable",
             "Ramp Up Time": "0",
             "Ramp Down Time": "0",
@@ -965,9 +1043,12 @@ class ImprovedTuningDialog(QDialog):
             "CEX Mode": "Master",
             "CEX Output Phase": "0",
             "RF Output Phase": "0",
-            
-            # ===== Pulse 기본값 - 수정됨 =====
-            "Pulse On/Off": "Disable",
+
+            # ===== Pulse 기본값 =====
+            "Pulsing Type": "Amplitude",
+            "Pulsing Mode": "Master",
+            "Pulse On/Off": "Off",
+            "Sync Output": "Off",
             "Pulse Frequency": "10000",
             "Pulse0 Level": "100.0",
             "Pulse1 Level": "75.0",
@@ -979,11 +1060,11 @@ class ImprovedTuningDialog(QDialog):
             "Pulse3 Duty": "20.0",
             "Input Sync Delay": "0",
             "Output Sync Delay": "0",
-            "Pulse Mode": "Master",
-            
+            "Width Control": "0",
+
             "Freq Tuning": "Disable",
-            "Retuning Mode": "One-Time",
-            "Setting Mode": "Fixed",
+            "Retuning Mode": "Disable",
+            "Setting Mode": "Disable",
             "Min Frequency": "0",
             "Max Frequency": "0",
             "Start Frequency": "0",
@@ -992,12 +1073,31 @@ class ImprovedTuningDialog(QDialog):
             "Stop Gamma": "0",
             "Return Gamma": "0",
             "Set RF Frequency": "0",
+
+            # Bank
+            "Bank1 Enable": "Disable",
+            "Bank1 Equation Enable": "Disable",
+            "Bank1 X0": "1.0",
+            "Bank1 A": "0.0",
+            "Bank1 B": "0.0",
+            "Bank1 C": "1.0",
+            "Bank1 D": "0.0",
+            "Bank2 Enable": "Disable",
+            "Bank2 Equation Enable": "Disable",
+            "Bank2 X0": "1.0",
+            "Bank2 A": "0.0",
+            "Bank2 B": "0.0",
+            "Bank2 C": "1.0",
+            "Bank2 D": "0.0",
+
             "IP Address": "127.0.0.1",
             "Subnet Mask": "255.255.255.0",
             "Gateway": "192.168.0.1",
             "DNS": "0.0.0.0"
         }
-        
+
+    def apply_defaults_to_ui(self, defaults):
+        """기본값을 UI에 적용"""
         for key, default_value in defaults.items():
             if key in self.inputs:
                 widget = self.inputs[key]
@@ -1007,8 +1107,6 @@ class ImprovedTuningDialog(QDialog):
                     widget.setValue(float(default_value))
                 elif isinstance(widget, QLineEdit):
                     widget.setText(default_value)
-        
-        QMessageBox.information(self, "복원 완료", "모든 설정이 기본값으로 복원되었습니다.")
     
     def validate_settings(self):
         """설정값 유효성 검사"""

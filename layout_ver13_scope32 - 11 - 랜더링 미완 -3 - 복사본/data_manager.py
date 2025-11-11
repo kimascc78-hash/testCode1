@@ -349,7 +349,70 @@ class TuningSettingsManager:
             return True, "튜닝 설정이 저장되었습니다."
         except Exception as e:
             return False, f"튜닝 설정 저장 실패: {str(e)}"
-    
+
+    def save_user_defaults(self, settings):
+        """사용자 기본값 저장 - 현재 설정을 기본값으로 저장"""
+        #####
+        # 실행 파일의 경로를 찾기 (PyInstaller 대응)
+        if getattr(sys, 'frozen', False):
+            base_path = sys._MEIPASS
+        else:
+            base_path = os.path.dirname(os.path.abspath(__file__))
+        #####
+        CONFIG_DIR = os.path.join(base_path, 'resources', 'config')
+        user_defaults_file = os.path.join(CONFIG_DIR, "user_default_tuning.json")
+
+        try:
+            os.makedirs(CONFIG_DIR, exist_ok=True)
+            with open(user_defaults_file, 'w', encoding='utf-8') as f:
+                json.dump(settings, f, indent=2, ensure_ascii=False)
+            return True, "현재 설정이 기본값으로 저장되었습니다."
+        except Exception as e:
+            return False, f"사용자 기본값 저장 실패: {str(e)}"
+
+    def load_user_defaults(self):
+        """사용자 기본값 로드"""
+        #####
+        # 실행 파일의 경로를 찾기 (PyInstaller 대응)
+        if getattr(sys, 'frozen', False):
+            base_path = sys._MEIPASS
+        else:
+            base_path = os.path.dirname(os.path.abspath(__file__))
+        #####
+        CONFIG_DIR = os.path.join(base_path, 'resources', 'config')
+        user_defaults_file = os.path.join(CONFIG_DIR, "user_default_tuning.json")
+
+        if os.path.exists(user_defaults_file):
+            try:
+                with open(user_defaults_file, 'r', encoding='utf-8') as f:
+                    user_defaults = json.load(f)
+                return True, user_defaults, "사용자 기본값을 로드했습니다."
+            except Exception as e:
+                return False, None, f"사용자 기본값 로드 실패: {str(e)}"
+        else:
+            return False, None, "사용자 기본값이 없습니다. 시스템 기본값을 사용합니다."
+
+    def delete_user_defaults(self):
+        """사용자 기본값 삭제"""
+        #####
+        # 실행 파일의 경로를 찾기 (PyInstaller 대응)
+        if getattr(sys, 'frozen', False):
+            base_path = sys._MEIPASS
+        else:
+            base_path = os.path.dirname(os.path.abspath(__file__))
+        #####
+        CONFIG_DIR = os.path.join(base_path, 'resources', 'config')
+        user_defaults_file = os.path.join(CONFIG_DIR, "user_default_tuning.json")
+
+        try:
+            if os.path.exists(user_defaults_file):
+                os.remove(user_defaults_file)
+                return True, "사용자 기본값이 삭제되었습니다."
+            else:
+                return True, "삭제할 사용자 기본값이 없습니다."
+        except Exception as e:
+            return False, f"사용자 기본값 삭제 실패: {str(e)}"
+
     def create_control_mode_data(self, settings):
         """제어 모드 설정 데이터 생성"""
         try:
