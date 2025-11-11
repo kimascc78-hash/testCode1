@@ -1123,7 +1123,7 @@ class TuningSettingsManager:
                 # 10. Pulse Frequency (SUBCMD 0x0A)
                 self._try_add_command(commands, self.create_pulse_frequency_data,
                                     RFProtocol.CMD_PULSE_SET,
-                                    RFProtocol.SUBCMD_PULSE_FREQUENCY,
+                                    RFProtocol.SUBCMD_PULSE_FREQ,
                                     '펄스 주파수 설정', settings)
 
             elif tab_name == "frequency":
