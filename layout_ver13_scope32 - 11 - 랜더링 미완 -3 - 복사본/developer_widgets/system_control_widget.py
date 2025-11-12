@@ -1,6 +1,6 @@
 """
 System Control Widget
-시스템 제어 컨테이너 (Accordion) - Power Limits, VA Limit, DCC Interface, Min/Max Control
+시스템 제어 컨테이너 (Accordion) - Power Limits, VA Limit, Min/Max Control
 """
 
 from PyQt5.QtWidgets import QWidget, QVBoxLayout
@@ -48,21 +48,9 @@ class SystemControlWidget(QWidget):
         )
         layout.addWidget(self.va_limit_widget)
         self.widgets.append(self.va_limit_widget)
-        
+
         # ========================================
-        # 3. DCC Interface
-        # ========================================
-        from developer_widgets.system_widgets.dcc_interface_widget import DCCInterfaceWidget
-        self.dcc_interface_widget = DCCInterfaceWidget(self, self.network_manager)
-        self.dcc_interface_widget.setChecked(False)
-        self.dcc_interface_widget.toggled.connect(
-            lambda checked: self.on_widget_toggled(self.dcc_interface_widget, checked)
-        )
-        layout.addWidget(self.dcc_interface_widget)
-        self.widgets.append(self.dcc_interface_widget)
-        
-        # ========================================
-        # 4. Min/Max Control
+        # 3. Min/Max Control
         # ========================================
         from developer_widgets.system_widgets.minmax_control_widget import MinMaxControlWidget
         self.minmax_control_widget = MinMaxControlWidget(self, self.network_manager)

@@ -64,24 +64,24 @@ class MainWindow(QMainWindow):
     def _setup_data_timer(self):
         """데이터 처리 타이머 설정 및 시작"""
         self.data_process_timer = QTimer(self)
-        
-        # 설정에서 간격 가져오기
-        interval_ms = 50  # 기본값
+
+        # 설정에서 간격 가져오기 (성능 최적화: 50ms → 100ms)
+        interval_ms = 100  # 기본값 (최적화)
         try:
             if hasattr(self, 'settings_manager'):
                 dc = self.settings_manager.settings.get("data_collection", {})
-                interval_ms = dc.get("status_interval_ms", 50)
+                interval_ms = dc.get("status_interval_ms", 100)
         except:
             pass
-        
-        self.data_process_timer.setInterval(interval_ms) 
-        
+
+        self.data_process_timer.setInterval(interval_ms)
+
         # DataProcessor의 주기적 처리 메서드와 연결
         self.data_process_timer.timeout.connect(self.data_processor.process_data_queue)
-        
+
         # 타이머 시작
         self.data_process_timer.start()
-        self.log_manager.write_log("[INFO] Data Processor Timer 시작 (50ms)", "cyan")
+        self.log_manager.write_log(f"[INFO] Data Processor Timer 시작 ({interval_ms}ms)", "cyan")
     
     def init_basic_settings(self):
         """기본 설정"""

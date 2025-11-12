@@ -1274,14 +1274,20 @@ class HybridRFClientThread(QThread):
                 self.status_socket.connect((self.host, self.port))
                 self.connection_established.emit()
                 self.connection_attempts = 0
-                
+
             except (socket.timeout, ConnectionRefusedError, socket.error) as e:
                 self._close_status_socket()
                 time.sleep(RECONNECT_BASE_DELAY * (2 ** min(self.connection_attempts, 5)))
         else:
-            failure_msg = "상태조회 최대 연결 시도 횟수 초과"
-            self.connection_failed.emit(failure_msg)
-            self.write_log(f"[ERROR] {failure_msg}")
+            # 최대 시도 횟수 초과 시 한 번만 실패 메시지 출력
+            if self.connection_attempts == RECONNECT_MAX_ATTEMPTS:
+                failure_msg = "상태조회 최대 연결 시도 횟수 초과"
+                self.connection_failed.emit(failure_msg)
+                self.write_log(f"[ERROR] {failure_msg}")
+
+            # 긴 대기 후 재시도를 위해 카운터 리셋
+            time.sleep(5.0)  # 5초 대기
+            self.connection_attempts = 0  # 카운터 리셋하여 나중에 다시 시도
     
     def _close_status_socket(self):
         """상태조회 소켓 종료"""

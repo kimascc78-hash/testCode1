@@ -4,8 +4,8 @@ RF Generator Enhanced Status Monitor - 문서 기준 비트 필드 정의
 """
 
 from PyQt5.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, 
-    QPushButton, QGroupBox, QFrame, QSizePolicy, QWidget
+    QDialog, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel,
+    QPushButton, QGroupBox, QFrame, QSizePolicy, QWidget, QCheckBox, QComboBox
 )
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal
 from PyQt5.QtGui import QFont, QPalette
@@ -69,27 +69,27 @@ class StatusMessages:
     VOLTAGE_UNIT = "V"
 
 class StatusColors:
-    """상태별 색상 정의 클래스"""
-    
-    # 기본 상태 색상
-    NORMAL_BG = "#44ff44"      # 정상: 녹색
-    NORMAL_TEXT = "#000000"
-    
-    CAUTION_BG = "#ffff44"     # 주의: 노란색  
+    """상태별 색상 정의 클래스 - DCC Interface와 통일"""
+
+    # 기본 상태 색상 (DCC Interface와 동일한 Material Design 팔레트)
+    NORMAL_BG = "#4CAF50"      # 정상: 녹색 (Material Green 500)
+    NORMAL_TEXT = "#ffffff"
+
+    CAUTION_BG = "#FFC107"     # 주의: 황색 (Material Amber 500)
     CAUTION_TEXT = "#000000"
-    
-    WARNING_BG = "#ff8844"     # 경고: 주황색
+
+    WARNING_BG = "#FF9800"     # 경고: 주황색 (Material Orange 500)
     WARNING_TEXT = "#000000"
-    
-    ERROR_BG = "#ff4444"       # 오류: 빨간색
+
+    ERROR_BG = "#F44336"       # 오류: 빨간색 (Material Red 500)
     ERROR_TEXT = "#ffffff"
-    
-    INACTIVE_BG = "#888888"    # 비활성: 회색
+
+    INACTIVE_BG = "#9E9E9E"    # 비활성: 회색 (Material Grey 500)
     INACTIVE_TEXT = "#ffffff"
-    
-    SPECIAL_BG = "#4444ff"     # 특수: 파란색 (저온 등)
+
+    SPECIAL_BG = "#2196F3"     # 특수: 파란색 (Material Blue 500)
     SPECIAL_TEXT = "#ffffff"
-    
+
     DISCONNECTED_BG = "#555555"  # 연결끊김: 어두운 회색
     DISCONNECTED_TEXT = "#ffffff"
 
@@ -147,12 +147,12 @@ class DisplayFormats:
 # =============================================================================
 
 STATUS_COLORS = {
-    "normal": {"background": StatusColors.NORMAL_BG, "text": StatusColors.NORMAL_TEXT, "border": "#228822"},
-    "caution": {"background": StatusColors.CAUTION_BG, "text": StatusColors.CAUTION_TEXT, "border": "#cccc22"},
-    "warning": {"background": StatusColors.WARNING_BG, "text": StatusColors.WARNING_TEXT, "border": "#cc5522"},
-    "error": {"background": StatusColors.ERROR_BG, "text": StatusColors.ERROR_TEXT, "border": "#cc2222"},
-    "inactive": {"background": StatusColors.INACTIVE_BG, "text": StatusColors.INACTIVE_TEXT, "border": "#555555"},
-    "special": {"background": StatusColors.SPECIAL_BG, "text": StatusColors.SPECIAL_TEXT, "border": "#2222cc"},
+    "normal": {"background": StatusColors.NORMAL_BG, "text": StatusColors.NORMAL_TEXT, "border": "#388E3C"},
+    "caution": {"background": StatusColors.CAUTION_BG, "text": StatusColors.CAUTION_TEXT, "border": "#FFA000"},
+    "warning": {"background": StatusColors.WARNING_BG, "text": StatusColors.WARNING_TEXT, "border": "#F57C00"},
+    "error": {"background": StatusColors.ERROR_BG, "text": StatusColors.ERROR_TEXT, "border": "#D32F2F"},
+    "inactive": {"background": StatusColors.INACTIVE_BG, "text": StatusColors.INACTIVE_TEXT, "border": "#757575"},
+    "special": {"background": StatusColors.SPECIAL_BG, "text": StatusColors.SPECIAL_TEXT, "border": "#1976D2"},
     "disconnected": {"background": StatusColors.DISCONNECTED_BG, "text": StatusColors.DISCONNECTED_TEXT, "border": "#333333"}
 }
 
@@ -356,19 +356,19 @@ class MinimalHeaderWidget(QWidget):
         progress_info['fill'].setStyleSheet(color_style)
         
     def get_status_color_style(self, status_type):
-        """상태별 색상 스타일"""
+        """상태별 색상 스타일 - DCC Interface와 통일"""
         base_style = "QWidget { border-radius: 2px; "
-        
+
         if status_type == "error":
-            return base_style + "background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #ff4444, stop:1 #ff6666); }"
+            return base_style + "background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #F44336, stop:1 #E57373); }"
         elif status_type == "warning":
-            return base_style + "background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #ff8844, stop:1 #ffaa44); }"
+            return base_style + "background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #FF9800, stop:1 #FFB74D); }"
         elif status_type == "caution":
-            return base_style + "background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #ffff44, stop:1 #ffff88); }"
+            return base_style + "background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #FFC107, stop:1 #FFD54F); }"
         elif status_type == "disconnected":
             return base_style + "background-color: #666666; }"
         else:  # normal
-            return base_style + "background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #44ff44, stop:1 #66ff88); }"
+            return base_style + "background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #4CAF50, stop:1 #81C784); }"
 
 # =============================================================================
 # 상태 표시 위젯
@@ -420,7 +420,12 @@ class StatusMonitorDialog(QDialog):
         self.parent_window = parent
         self.status_indicators = {}
         self.is_connected = False
-        
+
+        # 자동 갱신 설정
+        self.auto_refresh_enabled = True  # 기본값: 활성화
+        self.refresh_interval = 500  # 기본값: 500ms (원래대로 복원)
+        self.is_refreshing = False  # 갱신 중 플래그
+
         # 설정 매니저 참조 추가
         self.settings_manager = None
         if hasattr(parent, 'settings_manager'):
@@ -505,7 +510,75 @@ class StatusMonitorDialog(QDialog):
         self.connection_label.setAlignment(Qt.AlignCenter)
         self.connection_label.setStyleSheet(f"color: {DIALOG_COLORS['disconnected_text']}; font-size: 14px; font-weight: bold;")
         main_layout.addWidget(self.connection_label)
-        
+
+        # 자동 갱신 컨트롤 (옵션 1: 콤팩트 인라인 배치)
+        refresh_control_layout = QHBoxLayout()
+        refresh_control_layout.addStretch()
+
+        self.auto_refresh_checkbox = QCheckBox("Auto Refresh")
+        self.auto_refresh_checkbox.setChecked(self.auto_refresh_enabled)
+        self.auto_refresh_checkbox.setStyleSheet("color: #d8dee9; font-size: 12px;")
+        self.auto_refresh_checkbox.stateChanged.connect(self.toggle_auto_refresh)
+        refresh_control_layout.addWidget(self.auto_refresh_checkbox)
+
+        self.refresh_interval_combo = QComboBox()
+        self.refresh_interval_combo.addItems([
+            "100ms", "200ms", "500ms", "1000ms", "2000ms", "3000ms", "5000ms"
+        ])
+        self.refresh_interval_combo.setCurrentText("500ms")
+        self.refresh_interval_combo.setStyleSheet("""
+            QComboBox {
+                background-color: #3b4252;
+                color: #d8dee9;
+                border: 1px solid #4c566a;
+                border-radius: 4px;
+                padding: 4px 8px;
+                min-width: 80px;
+            }
+            QComboBox::drop-down {
+                border: none;
+            }
+            QComboBox::down-arrow {
+                image: none;
+                border-left: 4px solid transparent;
+                border-right: 4px solid transparent;
+                border-top: 5px solid #d8dee9;
+                margin-right: 5px;
+            }
+            QComboBox QAbstractItemView {
+                background-color: #3b4252;
+                color: #d8dee9;
+                selection-background-color: #5e81ac;
+            }
+        """)
+        self.refresh_interval_combo.currentTextChanged.connect(self.change_refresh_interval)
+        refresh_control_layout.addWidget(self.refresh_interval_combo)
+
+        self.manual_refresh_btn = QPushButton("⟳ Refresh Now")
+        self.manual_refresh_btn.clicked.connect(self.refresh_status)
+        self.manual_refresh_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {BUTTON_COLORS["refresh"]["normal"]};
+                border: none;
+                border-radius: 5px;
+                padding: 6px 12px;
+                color: white;
+                font-weight: bold;
+                font-size: 11px;
+            }}
+            QPushButton:hover {{
+                background-color: {BUTTON_COLORS["refresh"]["hover"]};
+            }}
+        """)
+        refresh_control_layout.addWidget(self.manual_refresh_btn)
+
+        # LED 표시등 (갱신 중 깜빡임)
+        self.status_led = QLabel("●")
+        self.status_led.setStyleSheet("color: #4CAF50; font-size: 16px;")
+        refresh_control_layout.addWidget(self.status_led)
+
+        main_layout.addLayout(refresh_control_layout)
+
         # ★ 개선된 미니멀 헤더 추가
         self.minimal_header = MinimalHeaderWidget(self)
         main_layout.addWidget(self.minimal_header)
@@ -531,41 +604,8 @@ class StatusMonitorDialog(QDialog):
         # 버튼 레이아웃
         button_layout = QHBoxLayout()
         button_layout.addStretch()
-        
-        refresh_btn = QPushButton("새로 고침")
-        refresh_btn.clicked.connect(self.refresh_status)
-        refresh_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {BUTTON_COLORS["refresh"]["normal"]};
-                border: none;
-                border-radius: 5px;
-                padding: 8px 16px;
-                color: white;
-                font-weight: bold;
-            }}
-            QPushButton:hover {{
-                background-color: {BUTTON_COLORS["refresh"]["hover"]};
-            }}
-        """)
-        
-        close_btn = QPushButton("닫기")
-        close_btn.clicked.connect(self.close)
-        close_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {BUTTON_COLORS["close"]["normal"]};
-                border: none;
-                border-radius: 5px;
-                padding: 8px 16px;
-                color: white;
-                font-weight: bold;
-            }}
-            QPushButton:hover {{
-                background-color: {BUTTON_COLORS["close"]["hover"]};
-            }}
-        """)
-        
-        #####
-        # 알람 클리어 버튼 추가
+
+        # 알람 클리어 버튼
         alarm_clear_btn = QPushButton("알람 클리어")
         alarm_clear_btn.clicked.connect(self.clear_alarm)
         alarm_clear_btn.setStyleSheet(f"""
@@ -582,10 +622,43 @@ class StatusMonitorDialog(QDialog):
             }}
         """)
         button_layout.addWidget(alarm_clear_btn)
-        #####
-        
-        button_layout.addWidget(refresh_btn)
+
+        # DCC Interface 버튼
+        dcc_interface_btn = QPushButton("DCC Interface")
+        dcc_interface_btn.clicked.connect(self.show_dcc_interface)
+        dcc_interface_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: #8fbcbb;
+                border: none;
+                border-radius: 5px;
+                padding: 8px 16px;
+                color: white;
+                font-weight: bold;
+            }}
+            QPushButton:hover {{
+                background-color: #88c0d0;
+            }}
+        """)
+        button_layout.addWidget(dcc_interface_btn)
+
+        # 닫기 버튼
+        close_btn = QPushButton("닫기")
+        close_btn.clicked.connect(self.close)
+        close_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {BUTTON_COLORS["close"]["normal"]};
+                border: none;
+                border-radius: 5px;
+                padding: 8px 16px;
+                color: white;
+                font-weight: bold;
+            }}
+            QPushButton:hover {{
+                background-color: {BUTTON_COLORS["close"]["hover"]};
+            }}
+        """)
         button_layout.addWidget(close_btn)
+
         main_layout.addLayout(button_layout)
         
     def create_system_parameters_section(self):
@@ -713,7 +786,46 @@ class StatusMonitorDialog(QDialog):
     def setup_update_timer(self):
         self.update_timer = QTimer(self)
         self.update_timer.timeout.connect(self.update_status_from_parent)
-        self.update_timer.start(500) #화면갱신 시간
+
+        if self.auto_refresh_enabled:
+            self.update_timer.start(self.refresh_interval)
+
+    def toggle_auto_refresh(self, state):
+        """자동 갱신 on/off 토글"""
+        self.auto_refresh_enabled = (state == Qt.Checked)
+        if self.auto_refresh_enabled:
+            self.update_timer.start(self.refresh_interval)
+            self.status_led.setStyleSheet("color: #4CAF50; font-size: 16px;")
+            if hasattr(self.parent_window, 'log_manager'):
+                self.parent_window.log_manager.write_log(
+                    f"[INFO] 자동 갱신 활성화: {self.refresh_interval}ms",
+                    "cyan"
+                )
+        else:
+            self.update_timer.stop()
+            self.status_led.setStyleSheet("color: #757575; font-size: 16px;")
+            if hasattr(self.parent_window, 'log_manager'):
+                self.parent_window.log_manager.write_log(
+                    "[INFO] 자동 갱신 비활성화",
+                    "yellow"
+                )
+
+    def change_refresh_interval(self, text):
+        """갱신 간격 변경"""
+        # "500ms" -> 500 변환
+        interval = int(text.replace("ms", ""))
+        self.refresh_interval = interval
+
+        # 타이머가 실행 중이면 재시작
+        if self.auto_refresh_enabled and self.update_timer.isActive():
+            self.update_timer.stop()
+            self.update_timer.start(self.refresh_interval)
+
+            if hasattr(self.parent_window, 'log_manager'):
+                self.parent_window.log_manager.write_log(
+                    f"[INFO] 갱신 간격 변경: {self.refresh_interval}ms",
+                    "cyan"
+                )
         
     def check_connection(self):
         try:
@@ -744,6 +856,9 @@ class StatusMonitorDialog(QDialog):
             return False
             
     def update_status_from_parent(self):
+        # LED 깜빡임 (주황색) - 최소 150ms 유지
+        self.status_led.setStyleSheet("color: #FF9800; font-size: 16px;")
+
         if self.check_connection():
             self.connection_label.setText(StatusMessages.CONNECTION_ESTABLISHED)
             self.connection_label.setStyleSheet(f"color: {DIALOG_COLORS['title']}; font-size: 14px; font-weight: bold;")
@@ -762,6 +877,10 @@ class StatusMonitorDialog(QDialog):
             if hasattr(self, 'minimal_header'):
                 for metric_id in ['forward_power', 'reflect_power', 'delivery_power', 'temperature']:
                     self.minimal_header.update_metric(metric_id, 0, "disconnected")
+
+        # LED 복구 (녹색) - 150ms 지연
+        if self.auto_refresh_enabled:
+            QTimer.singleShot(150, lambda: self.status_led.setStyleSheet("color: #4CAF50; font-size: 16px;"))
     
     def parse_led_state(self, led_state_value):
         """LED 상태 비트별 파싱 - 문서 기준"""
@@ -1040,7 +1159,10 @@ class StatusMonitorDialog(QDialog):
         self.minimal_header.update_metric('temperature', temperature, temp_status)
     
     def refresh_status(self):
+        """수동 새로 고침"""
         self.status_update_requested.emit()
+        self.update_status_from_parent()  # 즉시 업데이트
+
         if self.check_connection():
             if hasattr(self.parent_window, 'log_manager'):
                 self.parent_window.log_manager.write_log("[INFO] 상태 모니터 수동 새로 고침", "cyan")
@@ -1117,6 +1239,25 @@ class StatusMonitorDialog(QDialog):
                 
         except Exception as e:
             error_msg = f"알람 클리어 중 오류 발생: {str(e)}"
+            if hasattr(self.parent_window, 'log_manager'):
+                self.parent_window.log_manager.write_log(
+                    f"[ERROR] {error_msg}",
+                    "red"
+                )
+
+    def show_dcc_interface(self):
+        """DCC Interface 다이얼로그 표시"""
+        try:
+            from dcc_interface_dialog import DCCInterfaceDialog
+
+            dcc_dialog = DCCInterfaceDialog(self.parent_window)
+            dcc_dialog.exec_()  # 모달 다이얼로그로 표시
+
+            if hasattr(self.parent_window, 'log_manager'):
+                self.parent_window.log_manager.write_log("[INFO] DCC Interface 다이얼로그 열림", "cyan")
+
+        except Exception as e:
+            error_msg = f"DCC Interface 다이얼로그 열기 실패: {str(e)}"
             if hasattr(self.parent_window, 'log_manager'):
                 self.parent_window.log_manager.write_log(
                     f"[ERROR] {error_msg}",
